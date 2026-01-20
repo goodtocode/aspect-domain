@@ -24,7 +24,7 @@ public class DomainDispatcher(IServiceProvider serviceProvider) : IDomainDispatc
             var handlerType = typeof(IDomainHandler<>).MakeGenericType(domainEvent.GetType());
             var handler = _serviceProvider.GetService(handlerType);
             var handleMethod = handlerType.GetMethod("HandleAsync");
-            if (handleMethod != null)
+            if (handler != null && handleMethod != null)
             {
                 await (Task)handleMethod.Invoke(handler, [domainEvent])!;
             }
