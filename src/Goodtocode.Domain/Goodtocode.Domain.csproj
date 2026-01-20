@@ -13,7 +13,7 @@
 		<Authors>Robert Good</Authors>
 		<Company>Goodtocode</Company>
 		<Description>Foundational .NET types for building DDD, clean architecture, and event-driven systems.</Description>
-		<PackageTags>assertion;fluent;testing;unit test</PackageTags>
+		<PackageTags>domain-driven-design;ddd;entity;domain;library;dotnet;clean-architecture</PackageTags>
 		<RepositoryUrl>https://github.com/Goodtocode/aspect-domain</RepositoryUrl>
 		<PackageProjectUrl>https://github.com/Goodtocode/aspect-domain</PackageProjectUrl>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
