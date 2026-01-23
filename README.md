@@ -2,11 +2,11 @@
 
 # Goodtocode.Domain
 
-Domain-Driven Design (DDD) base library for .NET Standard 2.0+ and .NET 9
+Domain-Driven Design (DDD) base library for .NET Standard 2.0+ and .NET
 
 [![CI/CD Build, Test and Deploy](https://github.com/goodtocode/aspect-domain/actions/workflows/gtc-domain-ci-cd-nuget.yml/badge.svg)](https://github.com/goodtocode/aspect-domain/actions/workflows/gtc-domain-ci-cd-nuget.yml)
 
-Goodtocode.Domain provides foundational types for building DDD, clean architecture, and event-driven systems. It includes base classes for domain entities, audit fields, domain events, and secured/multi-tenant entities. The library is designed for extensibility and can be integrated into any .NET Standard 2.0+ or .NET 9 project.
+Goodtocode.Domain provides foundational types for building DDD, clean architecture, and event-driven systems. It includes base classes for domain entities, audit fields, domain events, and secured/multi-tenant entities. The library is designed for extensibility and can be integrated into any .NET Standard 2.0+ or .NET project.
 
 ## Features
 - Domain entity base with audit fields (`CreatedOn`, `ModifiedOn`, `DeletedOn`, `Timestamp`)
@@ -14,7 +14,7 @@ Goodtocode.Domain provides foundational types for building DDD, clean architectu
 - Equality and identity management for aggregate roots
 - Secured entity base for multi-tenancy and ownership (`OwnerId`, `TenantId`)
 - Extension methods for authorization and ownership queries
-- Lightweight, dependency-free, and compatible with .NET Standard 2.0+ and .NET 9
+- Lightweight, dependency-free, and compatible with .NET Standard 2.0+ and .NET
 - Designed for use with EF Core, CosmosDb, custom repositories, and APIs
 
 ## Quick-Start Steps
@@ -139,7 +139,8 @@ var authorizedAgents = dbContext.Agents.WhereAuthorized(tenantId, userId);
 
 | Version | Date        | Release Notes                                    |
 |---------|-------------|--------------------------------------------------|
-| 1.0.0   | 2026-Jan-19 | Initial release                                  |
+ | 1.1.0   | 2026-Jan-20 | Version bump, CI/CD improvements, props and targets updates |
+ | 1.0.0   | 2026-Jan-19 | Initial release                                  |
 
 ## License
 
