@@ -4,7 +4,7 @@
 
 Domain-Driven Design (DDD) base library for .NET Standard 2.0+ and .NET
 
-[![CI/CD Build, Test and Deploy](https://github.com/goodtocode/aspect-domain/actions/workflows/gtc-domain-ci-cd-nuget.yml/badge.svg)](https://github.com/goodtocode/aspect-domain/actions/workflows/gtc-domain-ci-cd-nuget.yml)
+[![NuGet CI/CD](https://github.com/goodtocode/aspect-domain/actions/workflows/gtc-domain-nuget.yml/badge.svg)](https://github.com/goodtocode/aspect-domain/actions/workflows/gtc-domain-nuget.yml)
 
 Goodtocode.Domain provides foundational types for building DDD, clean architecture, and event-driven systems. It includes base classes for domain entities, audit fields, domain events, and secured/multi-tenant entities. The library is designed for extensibility and can be integrated into any .NET Standard 2.0+ or .NET project.
 
