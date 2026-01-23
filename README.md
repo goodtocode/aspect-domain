@@ -139,7 +139,8 @@ var authorizedAgents = dbContext.Agents.WhereAuthorized(tenantId, userId);
 
 | Version | Date        | Release Notes                                    |
 |---------|-------------|--------------------------------------------------|
-| 1.0.0   | 2026-Jan-19 | Initial release                                  |
+ | 1.1.0   | 2026-Jan-20 | Version bump, CI/CD improvements, props and targets updates |
+ | 1.0.0   | 2026-Jan-19 | Initial release                                  |
 
 ## License
 
