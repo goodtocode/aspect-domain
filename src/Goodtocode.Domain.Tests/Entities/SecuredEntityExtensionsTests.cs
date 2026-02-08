@@ -9,6 +9,22 @@ public sealed class SecuredEntityExtensionsTests
     {
         public Guid OwnerId { get; set; }
         public Guid TenantId { get; set; }
+
+        public void SetOwnerId(Guid value)
+        {
+            OwnerId = value;
+        }
+
+        public void SetTenantId(Guid value)
+        {
+            TenantId = value;
+        }
+
+        public void SetSecurityContext(Guid ownerId, Guid tenantId)
+        {
+            OwnerId = ownerId;
+            TenantId = tenantId;
+        }
     }
 
     [TestMethod]
@@ -23,7 +39,7 @@ public sealed class SecuredEntityExtensionsTests
         }.AsQueryable();
 
         // Act
-        var result = entities.IsOwner(ownerId).ToList();
+        var result = entities.WhereOwner(ownerId).ToList();
 
         // Assert
         Assert.AreEqual(1, result.Count);

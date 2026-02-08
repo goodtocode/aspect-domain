@@ -6,12 +6,12 @@ namespace Goodtocode.Domain.Tests.Events;
 [TestClass]
 public sealed class DomainEventTests
 {
-    private class TestEntity : DomainEntity<TestEntity>
+    private sealed class TestEntity : DomainEntity<TestEntity>
     {
         public string Name { get; set; } = string.Empty;
     }
 
-    private class TestCreatedEvent(DomainEventTests.TestEntity entity) : IDomainEvent<TestEntity>
+    private sealed class TestCreatedEvent(DomainEventTests.TestEntity entity) : IDomainEvent<TestEntity>
     {
         public TestEntity Entity { get; } = entity;
 
