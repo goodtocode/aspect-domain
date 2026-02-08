@@ -6,15 +6,15 @@
 public static class SecuredEntityExtensions
 {
     /// <summary>
-    /// Filters the query to entities owned by the specified owner identifier.
+    /// Determines whether any entity in the query is owned by the specified owner identifier.
     /// </summary>
     /// <typeparam name="T">The type of the secured entity.</typeparam>
     /// <param name="query">The queryable collection of entities.</param>
     /// <param name="ownerId">The owner identifier (formerly OwnerId).</param>
-    /// <returns>A filtered queryable of entities owned by the specified owner identifier.</returns>
-    public static IQueryable<T> IsOwner<T>(this IQueryable<T> query, Guid ownerId) where T : ISecuredEntity<T>
+    /// <returns>True if any entity is owned by the specified owner identifier; otherwise, false.</returns>
+    public static bool IsOwner<T>(this IQueryable<T> query, Guid ownerId) where T : ISecuredEntity<T>
     {
-        return query.Where(x => x.OwnerId == ownerId);
+        return query.Any(x => x.OwnerId == ownerId);
     }
 
     /// <summary>
@@ -27,6 +27,30 @@ public static class SecuredEntityExtensions
     public static IQueryable<T> WhereOwner<T>(this IQueryable<T> query, Guid ownerId) where T : ISecuredEntity<T>
     {
         return query.Where(x => x.OwnerId == ownerId);
+    }
+
+    /// <summary>
+    /// Determines whether any entity in the query is owned by the specified tenant identifier.
+    /// </summary>
+    /// <typeparam name="T">The type of the secured entity.</typeparam>
+    /// <param name="query">The queryable collection of entities.</param>
+    /// <param name="tenantId">The tenant identifier.</param>
+    /// <returns>True if any entity is owned by the specified tenant identifier; otherwise, false.</returns>
+    public static bool IsTenant<T>(this IQueryable<T> query, Guid tenantId) where T : ISecuredEntity<T>
+    {
+        return query.Any(x => x.TenantId == tenantId);
+    }
+
+    /// <summary>
+    /// Filters the query to entities owned by the specified tenant identifier.
+    /// </summary>
+    /// <typeparam name="T">The type of the secured entity.</typeparam>
+    /// <param name="query">The queryable collection of entities.</param>
+    /// <param name="tenantId">The tenant identifier.</param>
+    /// <returns>A filtered queryable of entities owned by the specified tenant identifier.</returns>
+    public static IQueryable<T> WhereTenant<T>(this IQueryable<T> query, Guid tenantId) where T : ISecuredEntity<T>
+    {
+        return query.Where(x => x.TenantId == tenantId);
     }
 
     /// <summary>
@@ -53,5 +77,31 @@ public static class SecuredEntityExtensions
     public static IQueryable<T> WhereAuthorized<T>(this IQueryable<T> query, Guid tenantId, Guid ownerId) where T : ISecuredEntity<T>
     {
         return query.Where(x => x.TenantId == tenantId || x.OwnerId == ownerId);
+    }
+
+    /// <summary>
+    /// Determines whether any entity in the query has the specified security context.
+    /// </summary>
+    /// <typeparam name="T">The type of the secured entity.</typeparam>
+    /// <param name="query">The queryable collection of entities.</param>
+    /// <param name="ownerId">The owner identifier.</param>
+    /// <param name="tenantId">The tenant identifier.</param>
+    /// <returns>True if any entity has the specified security context; otherwise, false.</returns>
+    public static bool IsSecurityContext<T>(this IQueryable<T> query, Guid ownerId, Guid tenantId) where T : ISecuredEntity<T>
+    {
+        return query.Any(x => x.OwnerId == ownerId && x.TenantId == tenantId);
+    }
+
+    /// <summary>
+    /// Filters the query to entities with the specified security context.
+    /// </summary>
+    /// <typeparam name="T">The type of the secured entity.</typeparam>
+    /// <param name="query">The queryable collection of entities.</param>
+    /// <param name="ownerId">The owner identifier.</param>
+    /// <param name="tenantId">The tenant identifier.</param>
+    /// <returns>A filtered queryable of entities with the specified security context.</returns>
+    public static IQueryable<T> WhereSecurityContext<T>(this IQueryable<T> query, Guid ownerId, Guid tenantId) where T : ISecuredEntity<T>
+    {
+        return query.Where(x => x.OwnerId == ownerId && x.TenantId == tenantId);
     }
 }

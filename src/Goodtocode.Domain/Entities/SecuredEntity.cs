@@ -43,4 +43,27 @@ public abstract class SecuredEntity<TModel> : DomainEntity<TModel>, ISecuredEnti
         OwnerId = ownerId;
         TenantId = tenantId;
     }
+
+    /// <summary>
+    /// Sets the owner identifier for the entity.
+    /// </summary>
+    /// <param name="value">The owner identifier (OID).</param>
+    public void SetOwnerId(Guid value) => OwnerId = value;
+
+    /// <summary>
+    /// Sets the tenant identifier for the entity.
+    /// </summary>
+    /// <param name="value">The tenant identifier (TID).</param>
+    public void SetTenantId(Guid value) => TenantId = value;
+
+    /// <summary>
+    /// Sets both the owner identifier and tenant identifier for the entity.
+    /// </summary>
+    /// <param name="ownerId">The owner identifier (OID).</param>
+    /// <param name="tenantId">The tenant identifier (TID).</param>
+    public void SetSecurityContext(Guid ownerId, Guid tenantId)
+    {
+        OwnerId = ownerId;
+        TenantId = tenantId;
+    }
 }
