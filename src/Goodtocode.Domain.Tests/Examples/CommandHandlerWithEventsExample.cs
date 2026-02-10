@@ -345,7 +345,7 @@ public class CommandHandlerWithEventsExample
     #region 8. Integration Tests - Demonstrating the Full Flow
 
     [TestMethod]
-    public async Task CreatePerson_AddsEntityToDbContext_AndDispatchesEventToServiceBus()
+    public async Task CreatePersonAddsEntityToDbContextAndDispatchesEventToServiceBus()
     {
         // Arrange - Setup infrastructure
         var dbContext = new InMemoryDbContext();
@@ -392,7 +392,7 @@ public class CommandHandlerWithEventsExample
     }
 
     [TestMethod]
-    public async Task VerifyPerson_DispatchesMultipleEvents_ToServiceBus()
+    public async Task VerifyPersonDispatchesMultipleEventsToServiceBus()
     {
         // Arrange - Create person first
         var dbContext = new InMemoryDbContext();
@@ -443,7 +443,7 @@ public class CommandHandlerWithEventsExample
     }
 
     [TestMethod]
-    public async Task CommandHandler_WithServiceBusFailure_ShouldHandleGracefully()
+    public async Task CommandHandlerWithServiceBusFailureShouldHandleGracefully()
     {
         // Arrange - Setup failing service bus
         var dbContext = new InMemoryDbContext();
