@@ -8,6 +8,7 @@ namespace Goodtocode.Domain.Tests.Examples;
 /// Shows how to implement security-by-design using TenantId, OwnerId, and audit fields.
 /// </summary>
 [TestClass]
+[DoNotParallelize]
 public class RowLevelSecurityExample
 {
     #region Domain Entity with RLS
@@ -57,13 +58,18 @@ public class RowLevelSecurityExample
     {
         private readonly Guid _currentUserId;
         private readonly Guid _currentTenantId;
-        private static readonly List<Document> _allDocuments = []; // Make this static
+        private static readonly List<Document> _allDocuments = [];
 
         public SecuredDbContext(Guid currentUserId, Guid currentTenantId)
         {
             _currentUserId = currentUserId;
             _currentTenantId = currentTenantId;
         }
+
+        /// <summary>
+        /// Clears all documents - used for test isolation
+        /// </summary>
+        public static void ClearAllDocuments() => _allDocuments.Clear();
 
         /// <summary>
         /// Simulates EF Core query filter: WHERE TenantId == @TenantId AND DeletedOn IS NULL
@@ -99,6 +105,17 @@ public class RowLevelSecurityExample
         }
 
         public Task<int> SaveChangesAsync() => Task.FromResult(_allDocuments.Count);
+    }
+
+    #endregion
+
+    #region Test Infrastructure
+
+    [TestInitialize]
+    public void TestInitialize()
+    {
+        // Clear shared state before each test to prevent test interference
+        SecuredDbContext.ClearAllDocuments();
     }
 
     #endregion
