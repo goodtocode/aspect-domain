@@ -1,135 +1,155 @@
-
-
 # Goodtocode.Domain
 
-Domain-Driven Design (DDD) base library for .NET Standard 2.0+ and .NET
+Domain-Driven Design (DDD) base library for .NET Standard 2.1 and modern .NET projects.
 
 [![NuGet CI/CD](https://github.com/goodtocode/aspect-domain/actions/workflows/gtc-domain-nuget.yml/badge.svg)](https://github.com/goodtocode/aspect-domain/actions/workflows/gtc-domain-nuget.yml)
 
-Goodtocode.Domain provides foundational types for building DDD, clean architecture, and event-driven systems. It includes base classes for domain entities, audit fields, domain events, and secured/multi-tenant entities. The library is designed for extensibility and can be integrated into any .NET Standard 2.0+ or .NET project.
+Goodtocode.Domain provides foundational types for building DDD, clean architecture, and event-driven systems. It includes base classes for domain entities, audit fields, domain events, and secured/multi-tenant entities. The library is lightweight, dependency-free, and designed to work with EF Core, Cosmos DB, or custom repositories.
+
+## Target Frameworks
+- Library: `netstandard2.1`
+- Tests/examples: `net10.0`
 
 ## Features
-- Domain entity base with audit fields (`CreatedOn`, `ModifiedOn`, `DeletedOn`, `Timestamp`)
-- Domain event pattern for eventual consistency and cross-context communication
+- Domain entity base with audit fields (`CreatedOn`, `ModifiedOn`, `DeletedOn`, `CreatedBy`, `ModifiedBy`, `DeletedBy`, `Timestamp`)
+- Domain event pattern and dispatcher (`IDomainEvent`, `IDomainHandler`, `DomainDispatcher`)
 - Equality and identity management for aggregate roots
+- Partition key support for document stores (`PartitionKey`)
 - Secured entity base for multi-tenancy and ownership (`OwnerId`, `TenantId`)
 - Extension methods for authorization and ownership queries
-- Lightweight, dependency-free, and compatible with .NET Standard 2.0+ and .NET
-- Designed for use with EF Core, CosmosDb, custom repositories, and APIs
 
-## Quick-Start Steps
+## Install
+```bash
+dotnet add package Goodtocode.Domain
+```
+
+## Quick-Start (Repo)
 1. Clone this repository
    ```
    git clone https://github.com/goodtocode/aspect-domain.git
    ```
-2. Install .NET SDK (latest recommended)
-   ```
-   winget install Microsoft.DotNet.SDK --silent
-   ```
-3. Build the solution
+2. Build the solution
    ```
    cd src
    dotnet build Goodtocode.Domain.sln
    ```
-4. Run tests
+3. Run tests
    ```
    cd Goodtocode.Domain.Tests
    dotnet test
    ```
 
-## Install Prerequisites
-- [.NET SDK (latest)](https://dotnet.microsoft.com/en-us/download)
-- Visual Studio (latest) or VS Code
+## Core Concepts
+- `DomainEntity<TModel>`: Base entity with audit fields, identity, and domain event tracking.
+- `SecuredEntity<TModel>`: Adds `OwnerId` and `TenantId`, with `PartitionKey` defaulting to `TenantId.ToString()`.
+- Domain events: Implement `IDomainEvent<TModel>` and dispatch with `DomainDispatcher`.
 
-## Top Use Case Examples
+## Key Examples
 
 ### 1. Basic Domain Entity with Audit Fields
 ```csharp
-using Goodtocode.Domain.DomainEntity;
+using Goodtocode.Domain.Entities;
 
-public class MyEntity : DomainEntity<MyEntity>
+public sealed class MyEntity : DomainEntity<MyEntity>
 {
     public string Name { get; private set; } = string.Empty;
     public int Value { get; private set; }
 
-    public static MyEntity Create(Guid id, string name, int value)
+    public static MyEntity Create(Guid id, string name, int value, Guid createdBy)
     {
-        return new MyEntity
+        var entity = new MyEntity
         {
             Id = id == Guid.Empty ? Guid.NewGuid() : id,
             Name = name,
-            Value = value,
-            CreatedOn = DateTime.UtcNow
+            Value = value
         };
+
+        entity.SetCreatedOn(DateTime.UtcNow);
+        entity.SetCreatedBy(createdBy);
+
+        return entity;
     }
 }
 ```
 
-### 2. Secured Entity for Multi-Tenant and Ownership Scenarios
+### 2. Secured Entity with Multi-Tenant Ownership
 ```csharp
-using Goodtocode.Domain.SecuredEntity;
+using Goodtocode.Domain.Entities;
 
-public class DigitalAgentEntity : SecuredEntity<DigitalAgentEntity>
+public sealed class Document : SecuredEntity<Document>
 {
-    protected DigitalAgentEntity() { }
+    public string Title { get; private set; } = string.Empty;
 
-    public Guid DigitalAssetId { get; private set; }
-    public string? Name { get; private set; } = string.Empty;
-    public string? Description { get; private set; } = string.Empty;
-    public AgentStatus Status { get; private set; } = AgentStatus.Inactive;
-    public ICollection<string> Tags { get; private set; } = [];
-    public virtual Guid AgentPersonaId { get; private set; } = Personas.Monitor.Id;
+    private Document() { }
 
-    public static DigitalAgentEntity Create(Guid id, Guid digitalAssetId, Guid agentPersonaId, Guid tenantId, Guid ownerId, AgentStatus status, string? name = null, string? description = null)
+    public Document(Guid id, Guid ownerId, Guid tenantId, string title)
+        : base(id, ownerId, tenantId)
     {
-        return new DigitalAgentEntity()
-        {
-            Id = id == Guid.Empty ? Guid.NewGuid() : id,
-            DigitalAssetId = digitalAssetId,
-            AgentPersonaId = agentPersonaId,
-            Status = status,
-            Name = name,
-            Description = description,
-            TenantId = tenantId,
-            OwnerId = ownerId
-        };
-    }
-
-    public void Activate() => Status = AgentStatus.Active;
-    public void Deactivate() => Status = AgentStatus.Inactive;
-    public void Update(string? name, string? description)
-    {
-        Name = name;
-        Description = description;
+        Title = title;
+        SetCreatedOn(DateTime.UtcNow);
+        SetCreatedBy(ownerId);
     }
 }
+
+// Query helpers
+var ownedDocuments = queryableDocuments.WhereOwner(ownerId);
+var tenantDocuments = queryableDocuments.WhereTenant(tenantId);
+var authorized = queryableDocuments.WhereAuthorized(tenantId, ownerId);
 ```
 
-### 3. Domain Events for Eventual Consistency
+### 3. Domain Events + Dispatcher
 ```csharp
-using Goodtocode.Domain.DomainEvent;
+using Goodtocode.Domain.Entities;
+using Goodtocode.Domain.Events;
 
-public class MyCreatedEvent : IDomainEvent<MyEntity>
+public sealed class Person : SecuredEntity<Person>
 {
-    public MyEntity Entity { get; }
-    public MyCreatedEvent(MyEntity entity) => Entity = entity;
+    public string Email { get; private set; } = string.Empty;
+
+    public Person(Guid id, Guid ownerId, Guid tenantId, string email)
+        : base(id, ownerId, tenantId)
+    {
+        Email = email;
+        SetCreatedOn(DateTime.UtcNow);
+        AddDomainEvent(new PersonCreatedEvent(this));
+    }
 }
 
-// Usage in entity
-var entity = MyEntity.Create(Guid.NewGuid(), "Test", 42);
-entity.AddDomainEvent(new MyCreatedEvent(entity));
+public sealed class PersonCreatedEvent : IDomainEvent<Person>
+{
+    public Person Item { get; }
+    public DateTime OccurredOn { get; }
+
+    public PersonCreatedEvent(Person person)
+    {
+        Item = person;
+        OccurredOn = DateTime.UtcNow;
+    }
+}
+
+public sealed class PersonCreatedHandler : IDomainHandler<PersonCreatedEvent>
+{
+    public Task HandleAsync(PersonCreatedEvent domainEvent)
+    {
+        Console.WriteLine($"Created: {domainEvent.Item.Email}");
+        return Task.CompletedTask;
+    }
+}
+
+// Dispatcher usage (with your DI container)
+var serviceProvider = new ServiceCollection()
+    .AddTransient<IDomainHandler<PersonCreatedEvent>, PersonCreatedHandler>()
+    .BuildServiceProvider();
+
+var dispatcher = new DomainDispatcher(serviceProvider);
+await dispatcher.DispatchAsync(person.DomainEvents);
+person.ClearDomainEvents();
 ```
 
-### 4. Secured Entity Authorization Extensions
-```csharp
-using Goodtocode.Domain.SecuredEntity;
-
-// Query for entities owned by a user
-var ownedAgents = dbContext.Agents.IsOwner(userId);
-
-// Query for entities authorized for a tenant or owner
-var authorizedAgents = dbContext.Agents.WhereAuthorized(tenantId, userId);
-```
+## Complete Examples
+See the fully working examples in the test project:
+- `Goodtocode.Domain.Tests/Examples/RowLevelSecurityExample.cs` (row-level security, audit fields, and partition key usage)
+- `Goodtocode.Domain.Tests/Examples/CommandHandlerWithEventsExample.cs` (command handlers, domain events, dispatcher, and service bus integration)
 
 ## Technologies
 - [C# .NET](https://docs.microsoft.com/en-us/dotnet/csharp/)
@@ -137,15 +157,14 @@ var authorizedAgents = dbContext.Agents.WhereAuthorized(tenantId, userId);
 
 ## Version History
 
-| Version | Date        | Release Notes                                    |
-|---------|-------------|--------------------------------------------------|
- | 1.1.0   | 2026-Jan-20 | Version bump, CI/CD improvements, props and targets updates |
- | 1.0.0   | 2026-Jan-19 | Initial release                                  |
+| Version | Date        | Release Notes     |
+|---------|-------------|-------------------|
+| 1.0.0   | 2026-Jan-19 | Initial release   |
 
 ## License
 
 This project is licensed with the [MIT license](https://mit-license.org/).
 
 ## Contact
-- [GitHub Repo](https://github.com/goodtocode/aspect-domain)
+- [GitHub Repo](https://github.com/goodtocode)
 - [@goodtocode](https://twitter.com/goodtocode)
