@@ -1,5 +1,6 @@
 using Goodtocode.Domain.Entities;
 using Goodtocode.Domain.Events;
+using Microsoft.Testing.Platform.Services;
 
 namespace Goodtocode.Domain.Tests.Examples;
 
@@ -501,7 +502,7 @@ public class CommandHandlerWithEventsExample
 
         public void AddTransient<TService>(Func<IServiceProvider, TService> factory)
         {
-            Add(new ServiceDescriptor(typeof(TService), factory));
+            Add(new ServiceDescriptor(typeof(TService), sp => factory(sp)!));
         }
 
         public ServiceCollection BuildServiceProvider() => this;
