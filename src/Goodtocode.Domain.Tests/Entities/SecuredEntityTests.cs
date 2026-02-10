@@ -401,7 +401,7 @@ public sealed class SecuredEntityTests
 
         // Assert
         Assert.AreEqual(id, entity.Id);
-        Assert.AreEqual(string.Empty, entity.PartitionKey);
+        Assert.AreEqual(entity.PartitionKey, entity.TenantId.ToString());
         Assert.AreEqual(default, entity.CreatedOn);
         Assert.IsNull(entity.ModifiedOn);
         Assert.IsNull(entity.DeletedOn);

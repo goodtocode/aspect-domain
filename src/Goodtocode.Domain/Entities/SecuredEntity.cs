@@ -8,6 +8,11 @@
 public abstract class SecuredEntity<TModel> : DomainEntity<TModel>, ISecuredEntity<TModel>
 {
     /// <summary>
+    /// Gets the partition key for the entity, defaults to TenantId for multi-tenant data isolation.
+    /// </summary>
+    public new string PartitionKey => TenantId.ToString();
+
+    /// <summary>
     /// Gets the owner identifier (formerly OwnerId, typically OID) for the entity.
     /// </summary>
     public Guid OwnerId { get; protected set; } = Guid.Empty; // OID

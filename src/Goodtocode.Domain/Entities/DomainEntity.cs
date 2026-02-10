@@ -38,6 +38,21 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     public DateTime? DeletedOn { get; protected set; }
 
     /// <summary>
+    /// Gets the identifier of the user who created the entity.
+    /// </summary>
+    public Guid CreatedBy { get; protected set; }
+
+    /// <summary>
+    /// Gets the identifier of the user who last modified the entity.
+    /// </summary>
+    public Guid? ModifiedBy { get; protected set; }
+
+    /// <summary>
+    /// Gets the identifier of the user who deleted the entity.
+    /// </summary>
+    public Guid? DeletedBy { get; protected set; }
+
+    /// <summary>
     /// Gets the timestamp for concurrency and audit purposes.
     /// </summary>
     public DateTimeOffset Timestamp { get; protected set; } = DateTimeOffset.UtcNow;
@@ -124,6 +139,24 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     /// </summary>
     /// <param name="value">The deletion date and time.</param>
     public void SetDeletedOn(DateTime? value) => DeletedOn = value;
+
+    /// <summary>
+    /// Sets the identifier of the user who created the entity.
+    /// </summary>
+    /// <param name="value">The user identifier.</param>
+    public void SetCreatedBy(Guid value) => CreatedBy = value;
+
+    /// <summary>
+    /// Sets the identifier of the user who last modified the entity.
+    /// </summary>
+    /// <param name="value">The user identifier.</param>
+    public void SetModifiedBy(Guid? value) => ModifiedBy = value;
+
+    /// <summary>
+    /// Sets the identifier of the user who deleted the entity.
+    /// </summary>
+    /// <param name="value">The user identifier.</param>
+    public void SetDeletedBy(Guid? value) => DeletedBy = value;
 
     /// <summary>
     /// Determines whether the specified object is equal to the current entity.

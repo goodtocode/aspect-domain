@@ -15,8 +15,11 @@ public sealed class SecuredEntityExtensionsTests
         public Guid Id { get; set; } = Guid.NewGuid();
         public string PartitionKey { get; set; } = string.Empty;
         public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
+        public Guid CreatedBy { get; set; } = Guid.Empty;
         public DateTime? ModifiedOn { get; set; }
+        public Guid? ModifiedBy { get; set; }
         public DateTime? DeletedOn { get; set; }
+        public Guid? DeletedBy { get; set; }
         public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;
 
         public void AddDomainEvent(IDomainEvent<TestSecuredEntity> domainEvent)
