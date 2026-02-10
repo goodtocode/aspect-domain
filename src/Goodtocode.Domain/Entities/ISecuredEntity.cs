@@ -1,6 +1,6 @@
 ﻿namespace Goodtocode.Domain.Entities;
 
-public interface ISecuredEntity<TModel>
+public interface ISecuredEntity<TModel> : IDomainEntity<TModel>
 {
     /// <summary>
     /// Gets the owner identifier (formerly OwnerId, typically OID).

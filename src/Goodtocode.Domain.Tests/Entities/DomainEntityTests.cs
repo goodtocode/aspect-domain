@@ -18,9 +18,13 @@ public sealed class DomainEntityTests
 
     private sealed class TestEvent : IDomainEvent<TestEntity>
     {
-        public TestEntity Item => throw new NotImplementedException();
+        public TestEntity Item { get; set; }
+        public DateTime OccurredOn { get; set; } = DateTime.UtcNow;
 
-        public DateTime OccurredOn => throw new NotImplementedException();
+        public TestEvent(TestEntity item)
+        {
+            Item = item;
+        }
     }
 
     [TestMethod]
@@ -70,6 +74,22 @@ public sealed class DomainEntityTests
     }
 
     [TestMethod]
+    public void ConstructorWithPartitionKeyOnlyMaintainsPartitionKey()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+        var partitionKey = "cosmos-partition-key";
+
+        // Act
+        var entity = new TestEntity(id, partitionKey);
+
+        // Assert
+        Assert.AreEqual(partitionKey, entity.PartitionKey);
+        Assert.AreEqual(id, entity.Id);
+        Assert.AreEqual(string.Empty, entity.Name);
+    }
+
+    [TestMethod]
     public void AuditFieldsAreSetCorrectly()
     {
         // Arrange
@@ -83,6 +103,42 @@ public sealed class DomainEntityTests
         Assert.AreEqual(ts, entity.Timestamp);
         Assert.IsNull(entity.ModifiedOn);
         Assert.IsNull(entity.DeletedOn);
+    }
+
+    [TestMethod]
+    public void FullConstructorSetsAllProperties()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+        var partitionKey = "full-partition";
+        var createdOn = DateTime.UtcNow;
+        var timestamp = DateTimeOffset.UtcNow;
+
+        // Act
+        var entity = new TestEntity(id, partitionKey, createdOn, timestamp);
+
+        // Assert
+        Assert.AreEqual(id, entity.Id);
+        Assert.AreEqual(partitionKey, entity.PartitionKey);
+        Assert.AreEqual(createdOn, entity.CreatedOn);
+        Assert.AreEqual(timestamp, entity.Timestamp);
+        Assert.IsNull(entity.ModifiedOn);
+        Assert.IsNull(entity.DeletedOn);
+    }
+
+    [TestMethod]
+    public void TimestampIsSetByDefault()
+    {
+        // Arrange
+        var beforeCreation = DateTimeOffset.UtcNow;
+
+        // Act
+        var entity = new TestEntity();
+        var afterCreation = DateTimeOffset.UtcNow;
+
+        // Assert
+        Assert.IsTrue(entity.Timestamp >= beforeCreation);
+        Assert.IsTrue(entity.Timestamp <= afterCreation);
     }
 
     [TestMethod]
@@ -145,11 +201,89 @@ public sealed class DomainEntityTests
     }
 
     [TestMethod]
+    public void SetModifiedOnCanBeSetToNull()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+        entity.SetModifiedOn(DateTime.UtcNow);
+
+        // Act
+        entity.SetModifiedOn(null);
+
+        // Assert
+        Assert.IsNull(entity.ModifiedOn);
+    }
+
+    [TestMethod]
+    public void SetDeletedOnCanBeSetToNull()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+        entity.SetDeletedOn(DateTime.UtcNow);
+
+        // Act
+        entity.SetDeletedOn(null);
+
+        // Assert
+        Assert.IsNull(entity.DeletedOn);
+    }
+
+    [TestMethod]
+    public void AuditFieldsCanBeUpdatedMultipleTimes()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+        var firstModified = DateTime.UtcNow;
+        var secondModified = DateTime.UtcNow.AddMinutes(5);
+
+        // Act
+        entity.SetModifiedOn(firstModified);
+        entity.SetModifiedOn(secondModified);
+
+        // Assert
+        Assert.AreEqual(secondModified, entity.ModifiedOn);
+        Assert.AreNotEqual(firstModified, entity.ModifiedOn);
+    }
+
+    [TestMethod]
+    public void PartitionKeyMaintainedWhenAuditFieldsUpdated()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+        var partitionKey = "test-partition";
+        var entity = new TestEntity(id, partitionKey);
+        var modifiedOn = DateTime.UtcNow;
+
+        // Act
+        entity.SetModifiedOn(modifiedOn);
+
+        // Assert
+        Assert.AreEqual(partitionKey, entity.PartitionKey, "PartitionKey should remain unchanged");
+        Assert.AreEqual(id, entity.Id, "Id should remain unchanged");
+    }
+
+    [TestMethod]
+    public void IdMaintainedWhenAuditFieldsUpdated()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+        var entity = new TestEntity(id);
+
+        // Act
+        entity.SetCreatedOn(DateTime.UtcNow);
+        entity.SetModifiedOn(DateTime.UtcNow);
+        entity.SetDeletedOn(DateTime.UtcNow);
+
+        // Assert
+        Assert.AreEqual(id, entity.Id, "Id should remain unchanged after audit field updates");
+    }
+
+    [TestMethod]
     public void DomainEventsAddAndClearWorks()
     {
         // Arrange
         var entity = new TestEntity(Guid.NewGuid());
-        var evt = new TestEvent();
+        var evt = new TestEvent(entity);
 
         // Act
         entity.AddDomainEvent(evt);
@@ -170,8 +304,8 @@ public sealed class DomainEntityTests
     {
         // Arrange
         var entity = new TestEntity(Guid.NewGuid());
-        var evt1 = new TestEvent();
-        var evt2 = new TestEvent();
+        var evt1 = new TestEvent(entity);
+        var evt2 = new TestEvent(entity);
 
         // Act
         entity.AddDomainEvent(evt1);
@@ -181,6 +315,86 @@ public sealed class DomainEntityTests
         Assert.AreEqual(2, entity.DomainEvents.Count);
         Assert.AreSame(evt1, entity.DomainEvents[0]);
         Assert.AreSame(evt2, entity.DomainEvents[1]);
+    }
+
+    [TestMethod]
+    public void DomainEventsCollectionIsReadOnly()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+
+        // Act & Assert
+        Assert.IsInstanceOfType<IReadOnlyList<IDomainEvent<TestEntity>>>(entity.DomainEvents);
+    }
+
+    [TestMethod]
+    public void DomainEventsCollectionStartsEmpty()
+    {
+        // Arrange & Act
+        var entity = new TestEntity(Guid.NewGuid());
+
+        // Assert
+        Assert.IsNotNull(entity.DomainEvents);
+        Assert.AreEqual(0, entity.DomainEvents.Count);
+    }
+
+    [TestMethod]
+    public void DomainEventsCanBeAddedAndClearedMultipleTimes()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+        var evt1 = new TestEvent(entity);
+        var evt2 = new TestEvent(entity);
+
+        // Act & Assert - First round
+        entity.AddDomainEvent(evt1);
+        Assert.AreEqual(1, entity.DomainEvents.Count);
+        entity.ClearDomainEvents();
+        Assert.AreEqual(0, entity.DomainEvents.Count);
+
+        // Act & Assert - Second round
+        entity.AddDomainEvent(evt2);
+        Assert.AreEqual(1, entity.DomainEvents.Count);
+        entity.ClearDomainEvents();
+        Assert.AreEqual(0, entity.DomainEvents.Count);
+    }
+
+    [TestMethod]
+    public void DomainEventsMaintainOrderOfAddition()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+        var evt1 = new TestEvent(entity) { OccurredOn = DateTime.UtcNow };
+        var evt2 = new TestEvent(entity) { OccurredOn = DateTime.UtcNow.AddSeconds(1) };
+        var evt3 = new TestEvent(entity) { OccurredOn = DateTime.UtcNow.AddSeconds(2) };
+
+        // Act
+        entity.AddDomainEvent(evt1);
+        entity.AddDomainEvent(evt2);
+        entity.AddDomainEvent(evt3);
+
+        // Assert
+        Assert.AreEqual(3, entity.DomainEvents.Count);
+        Assert.AreSame(evt1, entity.DomainEvents[0]);
+        Assert.AreSame(evt2, entity.DomainEvents[1]);
+        Assert.AreSame(evt3, entity.DomainEvents[2]);
+    }
+
+    [TestMethod]
+    public void DomainEventsNotAffectedByAuditFieldUpdates()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+        var evt = new TestEvent(entity);
+        entity.AddDomainEvent(evt);
+
+        // Act
+        entity.SetModifiedOn(DateTime.UtcNow);
+        entity.SetDeletedOn(DateTime.UtcNow);
+
+        // Assert
+        Assert.AreEqual(1, entity.DomainEvents.Count, "Domain events should not be affected by audit field updates");
+        Assert.AreSame(evt, entity.DomainEvents[0]);
     }
 
     [TestMethod]
@@ -208,6 +422,32 @@ public sealed class DomainEntityTests
         Assert.IsFalse(a.Equals(b));
         Assert.IsFalse(a == b);
         Assert.IsTrue(a != b);
+    }
+
+    [TestMethod]
+    public void EqualitySameIdDifferentPropertiesAreEqual()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+        var a = new TestEntity(id) { Name = "Entity A" };
+        var b = new TestEntity(id) { Name = "Entity B" };
+
+        // Act & Assert
+        Assert.IsTrue(a.Equals(b), "Entities with same Id should be equal regardless of other properties");
+        Assert.IsTrue(a == b);
+    }
+
+    [TestMethod]
+    public void EqualitySameIdDifferentPartitionKeysAreEqual()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+        var a = new TestEntity(id, "partition-a");
+        var b = new TestEntity(id, "partition-b");
+
+        // Act & Assert
+        Assert.IsTrue(a.Equals(b), "Entities with same Id should be equal regardless of partition key");
+        Assert.IsTrue(a == b);
     }
 
     [TestMethod]
@@ -302,5 +542,72 @@ public sealed class DomainEntityTests
 
         // Assert
         Assert.AreEqual(hash1, hash2);
+    }
+
+    [TestMethod]
+    public void GetHashCodeSameIdDifferentPropertiesHaveSameHash()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+        var a = new TestEntity(id) { Name = "Entity A" };
+        var b = new TestEntity(id) { Name = "Entity B" };
+
+        // Act & Assert
+        Assert.AreEqual(a.GetHashCode(), b.GetHashCode(), "Entities with same Id should have same hash code");
+    }
+
+    [TestMethod]
+    public void PropertiesAreProtectedSet()
+    {
+        // Arrange & Act & Assert
+        var idProp = typeof(TestEntity).GetProperty("Id");
+        Assert.IsNotNull(idProp, "Id property should exist.");
+        Assert.IsNotNull(idProp.SetMethod, "Id property should have a set method.");
+        Assert.IsTrue(idProp.SetMethod.IsFamily, "Id setter should be protected.");
+
+        var partitionKeyProp = typeof(TestEntity).GetProperty("PartitionKey");
+        Assert.IsNotNull(partitionKeyProp, "PartitionKey property should exist.");
+        Assert.IsNotNull(partitionKeyProp.SetMethod, "PartitionKey property should have a set method.");
+        Assert.IsTrue(partitionKeyProp.SetMethod.IsFamily, "PartitionKey setter should be protected.");
+    }
+
+    [TestMethod]
+    public void AllConstructorsChainingPreservesBaseProperties()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+        var partitionKey = "test-pk";
+        var createdOn = DateTime.UtcNow;
+        var timestamp = DateTimeOffset.UtcNow;
+
+        // Act
+        var fullEntity = new TestEntity(id, partitionKey, createdOn, timestamp);
+
+        // Assert - verify all properties are set correctly through constructor chaining
+        Assert.AreEqual(id, fullEntity.Id);
+        Assert.AreEqual(partitionKey, fullEntity.PartitionKey);
+        Assert.AreEqual(createdOn, fullEntity.CreatedOn);
+        Assert.AreEqual(timestamp, fullEntity.Timestamp);
+    }
+
+    [TestMethod]
+    public void EntityCanBeUsedInCollections()
+    {
+        // Arrange
+        var id1 = Guid.NewGuid();
+        var id2 = Guid.NewGuid();
+        var entity1 = new TestEntity(id1);
+        var entity2 = new TestEntity(id2);
+        var entity3 = new TestEntity(id1); // Same Id as entity1
+
+        // Act
+        var list = new List<TestEntity> { entity1, entity2 };
+        var hashSet = new HashSet<TestEntity> { entity1, entity2, entity3 };
+
+        // Assert
+        Assert.AreEqual(2, list.Count);
+        Assert.AreEqual(2, hashSet.Count, "HashSet should contain only 2 unique entities based on Id");
+        Assert.IsTrue(list.Contains(entity1));
+        Assert.IsTrue(list.Contains(entity2));
     }
 }
