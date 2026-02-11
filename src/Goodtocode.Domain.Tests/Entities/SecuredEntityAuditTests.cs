@@ -1,5 +1,5 @@
 using Goodtocode.Domain.Entities;
-using Goodtocode.Domain.Events;
+using Goodtocode.Domain.Tests.TestHelpers;
 
 namespace Goodtocode.Domain.Tests.Entities;
 
@@ -330,7 +330,6 @@ public class SecuredEntityAuditTests
             ownerId,
             tenantId,
             "Initial Name");
-        entity.SetCreatedOn(DateTime.UtcNow);
         entity.SetCreatedBy(creatorId);
 
         // Act - Modify
@@ -426,7 +425,6 @@ public class SecuredEntityAuditTests
             "Sensitive Data");
 
         // Act - Track who accessed/modified data
-        entity.SetCreatedOn(DateTime.UtcNow);
         entity.SetCreatedBy(dataControllerUserId);
 
         var auditorUserId = Guid.NewGuid();

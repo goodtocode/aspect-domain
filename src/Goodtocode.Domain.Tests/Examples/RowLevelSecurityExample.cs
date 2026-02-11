@@ -1,5 +1,6 @@
 using Goodtocode.Domain.Entities;
 using Goodtocode.Domain.Events;
+using Goodtocode.Domain.Tests.TestHelpers;
 
 namespace Goodtocode.Domain.Tests.Examples;
 
@@ -36,14 +37,14 @@ public class RowLevelSecurityExample
         public void UpdateContent(string newContent, Guid modifiedBy)
         {
             Content = newContent;
-            SetModifiedOn(DateTime.UtcNow);
-            SetModifiedBy(modifiedBy);
+            this.SetModifiedOn(DateTime.UtcNow);
+            this.SetModifiedBy(modifiedBy);
         }
 
         public void SoftDelete(Guid deletedBy)
         {
-            SetDeletedOn(DateTime.UtcNow);
-            SetDeletedBy(deletedBy);
+            this.SetDeletedOn(DateTime.UtcNow);
+            this.SetDeletedBy(deletedBy);
         }
     }
 
@@ -136,12 +137,10 @@ public class RowLevelSecurityExample
 
         // Create documents for different tenants
         var doc1 = new Document(Guid.NewGuid(), user1, tenant1, "Tenant 1 Doc", "Secret content 1");
-        doc1.SetCreatedOn(DateTime.UtcNow);
         doc1.SetCreatedBy(user1);
         dbContext1.Add(doc1);
 
         var doc2 = new Document(Guid.NewGuid(), user2, tenant2, "Tenant 2 Doc", "Secret content 2");
-        doc2.SetCreatedOn(DateTime.UtcNow);
         doc2.SetCreatedBy(user2);
         dbContext2.Add(doc2);
 
@@ -223,7 +222,6 @@ public class RowLevelSecurityExample
         var dbContext = new SecuredDbContext(userId, tenantId);
 
         var doc = new Document(Guid.NewGuid(), userId, tenantId, "To Delete", "Content");
-        doc.SetCreatedOn(DateTime.UtcNow);
         doc.SetCreatedBy(userId);
         dbContext.Add(doc);
 
@@ -279,7 +277,6 @@ public class RowLevelSecurityExample
 
         // Act - Create
         var doc = new Document(Guid.NewGuid(), creatorId, tenantId, "Document", "Original content");
-        doc.SetCreatedOn(DateTime.UtcNow);
         doc.SetCreatedBy(creatorId);
         dbContext.Add(doc);
 
@@ -366,7 +363,10 @@ public class RowLevelSecurityExample
             tenantId,
             "Personal Data",
             "Sensitive personal information");
-        personalDoc.SetCreatedOn(DateTime.UtcNow.AddDays(-100));
+        // Set specific creation date for testing (using reflection for testing purposes only)
+        typeof(DomainEntity<Document>)
+            .GetProperty("CreatedOn")!
+            .SetValue(personalDoc, DateTime.UtcNow.AddDays(-100));
         personalDoc.SetCreatedBy(dataSubjectId);
         dbContext.Add(personalDoc);
 

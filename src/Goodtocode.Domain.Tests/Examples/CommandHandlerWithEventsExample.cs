@@ -1,5 +1,6 @@
 using Goodtocode.Domain.Entities;
 using Goodtocode.Domain.Events;
+using Goodtocode.Domain.Tests.TestHelpers;
 using Microsoft.Testing.Platform.Services;
 
 namespace Goodtocode.Domain.Tests.Examples;
@@ -37,8 +38,6 @@ public class CommandHandlerWithEventsExample
             Email = email;
             IsVerified = false;
 
-            SetCreatedOn(DateTime.UtcNow);
-
             // Add domain event for creation
             AddDomainEvent(new PersonCreatedEvent(this));
         }
@@ -48,7 +47,7 @@ public class CommandHandlerWithEventsExample
             if (!IsVerified)
             {
                 IsVerified = true;
-                SetModifiedOn(DateTime.UtcNow);
+                this.SetModifiedOn(DateTime.UtcNow);
 
                 // Add domain event for verification
                 AddDomainEvent(new PersonVerifiedEvent(this));
@@ -61,7 +60,7 @@ public class CommandHandlerWithEventsExample
             {
                 var oldEmail = Email;
                 Email = newEmail;
-                SetModifiedOn(DateTime.UtcNow);
+                this.SetModifiedOn(DateTime.UtcNow);
 
                 // Add domain event for email change
                 AddDomainEvent(new PersonEmailChangedEvent(this, oldEmail, newEmail));

@@ -15,47 +15,32 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     /// <summary>
     /// Gets the unique identifier for the entity.
     /// </summary>
-    public Guid Id { get; protected set; }
+    public Guid Id { get; private set; } = Guid.NewGuid();
 
     /// <summary>
     /// Gets the partition key for the entity, used for CosmosDb or similar stores.
     /// </summary>
-    public string PartitionKey { get; protected set; } = string.Empty;
+    public string PartitionKey { get; private set; }
 
     /// <summary>
     /// Gets the creation date and time of the entity.
     /// </summary>
-    public DateTime CreatedOn { get; protected set; }
+    public DateTime CreatedOn { get; private set; } = DateTime.UtcNow;
 
     /// <summary>
     /// Gets the last modification date and time of the entity.
     /// </summary>
-    public DateTime? ModifiedOn { get; protected set; }
+    public DateTime? ModifiedOn { get; private set; }
 
     /// <summary>
     /// Gets the deletion date and time of the entity, if deleted.
     /// </summary>
-    public DateTime? DeletedOn { get; protected set; }
-
-    /// <summary>
-    /// Gets the identifier of the user who created the entity.
-    /// </summary>
-    public Guid CreatedBy { get; protected set; }
-
-    /// <summary>
-    /// Gets the identifier of the user who last modified the entity.
-    /// </summary>
-    public Guid? ModifiedBy { get; protected set; }
-
-    /// <summary>
-    /// Gets the identifier of the user who deleted the entity.
-    /// </summary>
-    public Guid? DeletedBy { get; protected set; }
+    public DateTime? DeletedOn { get; private set; }
 
     /// <summary>
     /// Gets the timestamp for concurrency and audit purposes.
     /// </summary>
-    public DateTimeOffset Timestamp { get; protected set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset Timestamp { get; private set; } = DateTimeOffset.UtcNow;
 
     /// <summary>
     /// Gets the list of domain events associated with this entity.
@@ -68,6 +53,7 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     /// </summary>
     protected DomainEntity()
     {
+        PartitionKey = Id.ToString();
     }
 
     /// <summary>
@@ -98,7 +84,7 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     /// <param name="partitionKey">The partition key for the entity.</param>
     /// <param name="createdOn">The creation date and time.</param>
     /// <param name="timestamp">The timestamp for concurrency and audit.</param>
-    protected DomainEntity(Guid id, string partitionKey, DateTime createdOn, DateTimeOffset timestamp)
+    internal DomainEntity(Guid id, string partitionKey, DateTime createdOn, DateTimeOffset timestamp)
         : this(id, partitionKey)
     {
         CreatedOn = createdOn;
@@ -121,42 +107,6 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     {
         _domainEvents.Clear();
     }
-
-    /// <summary>
-    /// Sets the creation date and time of the entity.
-    /// </summary>
-    /// <param name="value">The creation date and time.</param>
-    public void SetCreatedOn(DateTime value) => CreatedOn = value;
-
-    /// <summary>
-    /// Sets the last modification date and time of the entity.
-    /// </summary>
-    /// <param name="value">The modification date and time.</param>
-    public void SetModifiedOn(DateTime? value) => ModifiedOn = value;
-
-    /// <summary>
-    /// Sets the deletion date and time of the entity.
-    /// </summary>
-    /// <param name="value">The deletion date and time.</param>
-    public void SetDeletedOn(DateTime? value) => DeletedOn = value;
-
-    /// <summary>
-    /// Sets the identifier of the user who created the entity.
-    /// </summary>
-    /// <param name="value">The user identifier.</param>
-    public void SetCreatedBy(Guid value) => CreatedBy = value;
-
-    /// <summary>
-    /// Sets the identifier of the user who last modified the entity.
-    /// </summary>
-    /// <param name="value">The user identifier.</param>
-    public void SetModifiedBy(Guid? value) => ModifiedBy = value;
-
-    /// <summary>
-    /// Sets the identifier of the user who deleted the entity.
-    /// </summary>
-    /// <param name="value">The user identifier.</param>
-    public void SetDeletedBy(Guid? value) => DeletedBy = value;
 
     /// <summary>
     /// Determines whether the specified object is equal to the current entity.

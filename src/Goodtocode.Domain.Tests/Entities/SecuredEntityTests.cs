@@ -1,5 +1,6 @@
 ﻿using Goodtocode.Domain.Entities;
 using Goodtocode.Domain.Events;
+using Goodtocode.Domain.Tests.TestHelpers;
 
 namespace Goodtocode.Domain.Tests.Entities;
 
@@ -187,20 +188,6 @@ public sealed class SecuredEntityTests
         Assert.AreEqual(2, entity.DomainEvents.Count);
         Assert.AreSame(evt1, entity.DomainEvents[0]);
         Assert.AreSame(evt2, entity.DomainEvents[1]);
-    }
-
-    [TestMethod]
-    public void SetCreatedOnUpdatesCreatedOnProperty()
-    {
-        // Arrange
-        var entity = new TestSecuredEntity(Guid.NewGuid());
-        var createdOn = DateTime.UtcNow;
-
-        // Act
-        entity.SetCreatedOn(createdOn);
-
-        // Assert
-        Assert.AreEqual(createdOn, entity.CreatedOn);
     }
 
     [TestMethod]
@@ -432,8 +419,7 @@ public sealed class SecuredEntityTests
     {
         // Arrange
         var entity = new TestSecuredEntity(Guid.NewGuid());
-        var createdOn = DateTime.UtcNow;
-        entity.SetCreatedOn(createdOn);
+        var createdOn = entity.CreatedOn; // Capture the auto-set CreatedOn value
         
         var newOwnerId = Guid.NewGuid();
         var newTenantId = Guid.NewGuid();

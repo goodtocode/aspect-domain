@@ -12,21 +12,17 @@ public interface ISecuredEntity<TModel> : IDomainEntity<TModel>
     Guid TenantId { get; }
 
     /// <summary>
-    /// Sets the owner identifier for the entity.
+    /// Gets the unique identifier of the user who created the entity.
     /// </summary>
-    /// <param name="value">The owner identifier (OID).</param>
-    void SetOwnerId(Guid value);
+    Guid CreatedBy { get; }
 
     /// <summary>
-    /// Sets the tenant identifier for the entity.
+    /// Gets the identifier of the user who last modified this entity.
     /// </summary>
-    /// <param name="value">The tenant identifier (TID).</param>
-    void SetTenantId(Guid value);
+    Guid? ModifiedBy { get; }
 
     /// <summary>
-    /// Sets both the owner identifier and tenant identifier for the entity.
+    /// Gets the identifier of the user who deleted this entity, or null if not deleted.
     /// </summary>
-    /// <param name="ownerId">The owner identifier (OID).</param>
-    /// <param name="tenantId">The tenant identifier (TID).</param>
-    void SetSecurityContext(Guid ownerId, Guid tenantId);
+    Guid? DeletedBy { get; }
 }
