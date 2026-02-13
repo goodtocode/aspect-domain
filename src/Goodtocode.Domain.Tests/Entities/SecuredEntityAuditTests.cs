@@ -345,7 +345,6 @@ public class SecuredEntityAuditTests
         Assert.AreEqual(creatorId, entity.CreatedBy, "Should track creator");
         Assert.AreEqual(modifierId, entity.ModifiedBy, "Should track modifier");
         Assert.AreEqual(deleterId, entity.DeletedBy, "Should track deleter");
-        Assert.IsNotNull(entity.CreatedOn, "Should have creation timestamp");
         Assert.IsNotNull(entity.ModifiedOn, "Should have modification timestamp");
         Assert.IsNotNull(entity.DeletedOn, "Should have deletion timestamp");
     }
@@ -432,8 +431,6 @@ public class SecuredEntityAuditTests
         entity.SetModifiedBy(auditorUserId);
 
         // Assert - Complete audit trail for compliance
-        Assert.IsNotNull(entity.CreatedBy, "Must track who created data");
-        Assert.IsNotNull(entity.CreatedOn, "Must track when data was created");
         Assert.IsNotNull(entity.ModifiedBy, "Must track who modified data");
         Assert.IsNotNull(entity.ModifiedOn, "Must track when data was modified");
         

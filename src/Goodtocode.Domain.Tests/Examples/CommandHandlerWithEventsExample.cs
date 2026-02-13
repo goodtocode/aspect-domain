@@ -468,7 +468,7 @@ public class CommandHandlerWithEventsExample
             Guid.NewGuid());
 
         // Act & Assert - Should throw exception when service bus fails
-        await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await handler.Handle(command));
 
         // Note: In production, you'd use patterns like:

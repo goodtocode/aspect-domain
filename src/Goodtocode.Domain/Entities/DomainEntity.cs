@@ -64,6 +64,7 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
         : this()
     {
         Id = id;
+        PartitionKey = id.ToString();
     }
 
     /// <summary>

@@ -5,7 +5,7 @@ namespace Goodtocode.Domain.Tests.Events;
 [TestClass]
 public sealed class DomainDispatcherTests
 {
-    private class TestEvent : IDomainEvent<TestEvent>
+    private sealed class TestEvent : IDomainEvent<TestEvent>
     {
         public TestEvent Item => throw new NotImplementedException();
 
@@ -22,7 +22,7 @@ public sealed class DomainDispatcherTests
         }
     }
 
-    private class ServiceProviderStub(object? handler) : IServiceProvider
+    private sealed class ServiceProviderStub(object? handler) : IServiceProvider
     {
         private readonly object? handler = handler;
 

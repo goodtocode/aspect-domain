@@ -6,7 +6,7 @@ namespace Goodtocode.Domain.Tests.Entities;
 [TestClass]
 public sealed class SecuredEntityExtensionsTests
 {
-    private class TestSecuredEntity : ISecuredEntity<TestSecuredEntity>
+    private sealed class TestSecuredEntity : ISecuredEntity<TestSecuredEntity>
     {
         public Guid OwnerId { get; set; }
         public Guid TenantId { get; set; }

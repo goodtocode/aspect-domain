@@ -36,9 +36,9 @@ public sealed class DomainEntityTests
 
         // Assert
         Assert.IsNotNull(entity);
-        Assert.AreEqual(Guid.Empty, entity.Id);
-        Assert.AreEqual(string.Empty, entity.PartitionKey);
-        Assert.AreEqual(default, entity.CreatedOn);
+        Assert.AreNotEqual(Guid.Empty, entity.Id);
+        Assert.AreEqual(entity.Id.ToString(), entity.PartitionKey);
+        Assert.AreNotEqual(default, entity.CreatedOn);
         Assert.IsNull(entity.ModifiedOn);
         Assert.IsNull(entity.DeletedOn);
     }
@@ -55,7 +55,7 @@ public sealed class DomainEntityTests
         // Assert
         Assert.IsNotNull(entity);
         Assert.AreEqual(id, entity.Id);
-        Assert.AreEqual(string.Empty, entity.PartitionKey);
+        Assert.AreEqual(id.ToString(), entity.PartitionKey);
     }
 
     [TestMethod]
