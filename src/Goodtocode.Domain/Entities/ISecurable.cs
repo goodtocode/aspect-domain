@@ -6,6 +6,18 @@
 public interface ISecurable
 {
     /// <summary>
+    /// Gets the owner identifier.
+    /// This is typically the unique identifier (OID) of the user or entity that owns this resource.
+    /// </summary>
+    Guid OwnerId { get; }
+
+    /// <summary>
+    /// Gets the tenant identifier.
+    /// This is the unique identifier (TID) of the tenant or organization to which this resource belongs.
+    /// </summary>
+    Guid TenantId { get; }
+
+    /// <summary>
     /// Identifier of the user who created the entity.
     /// </summary>
     Guid CreatedBy { get; }

@@ -5,7 +5,7 @@
 /// Suitable for multi-tenant and identity-aware scenarios (e.g., OID, TID from EEID/OBO flows).
 /// </summary>
 /// <typeparam name="TModel">The type of the domain model.</typeparam>
-public abstract class SecuredEntity<TModel> : DomainEntity<TModel>, ISecuredEntity<TModel>
+public abstract class SecuredEntity<TModel> : DomainEntity<TModel>, ISecurable
 {
     /// <summary>
     /// Gets the partition key for the entity, defaults to TenantId for multi-tenant data isolation.
