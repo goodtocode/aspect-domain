@@ -12,6 +12,7 @@ namespace Goodtocode.Domain.Tests.Examples;
 [DoNotParallelize]
 public class RowLevelSecurityExample
 {
+#pragma warning disable CA1822
     #region Domain Entity with RLS
 
     /// <summary>
@@ -55,17 +56,11 @@ public class RowLevelSecurityExample
     /// <summary>
     /// Simulates EF Core DbContext with RLS query filters
     /// </summary>
-    private sealed class SecuredDbContext
+    private sealed class SecuredDbContext(Guid currentUserId, Guid currentTenantId)
     {
-        private readonly Guid _currentUserId;
-        private readonly Guid _currentTenantId;
+        private readonly Guid _currentUserId = currentUserId;
+        private readonly Guid _currentTenantId = currentTenantId;
         private static readonly List<Document> _allDocuments = [];
-
-        public SecuredDbContext(Guid currentUserId, Guid currentTenantId)
-        {
-            _currentUserId = currentUserId;
-            _currentTenantId = currentTenantId;
-        }
 
         /// <summary>
         /// Clears all documents - used for test isolation
@@ -149,8 +144,8 @@ public class RowLevelSecurityExample
         var tenant2Documents = dbContext2.Documents.ToList();
 
         // Assert - Tenant isolation
-        Assert.AreEqual(1, tenant1Documents.Count, "Tenant 1 should only see their documents");
-        Assert.AreEqual(1, tenant2Documents.Count, "Tenant 2 should only see their documents");
+        Assert.HasCount(1, tenant1Documents, "Tenant 1 should only see their documents");
+        Assert.HasCount(1, tenant2Documents, "Tenant 2 should only see their documents");
         Assert.AreEqual("Tenant 1 Doc", tenant1Documents[0].Title);
         Assert.AreEqual("Tenant 2 Doc", tenant2Documents[0].Title);
     }
@@ -178,7 +173,7 @@ public class RowLevelSecurityExample
         var owner1Docs = dbContextOwner1.MyDocuments.ToList();
 
         // Assert - Owner restriction
-        Assert.AreEqual(1, owner1Docs.Count, "Should only see own documents");
+        Assert.HasCount(1, owner1Docs, "Should only see own documents");
         Assert.AreEqual(owner1, owner1Docs[0].OwnerId);
         Assert.AreEqual(owner1, owner1Docs[0].CreatedBy);
     }
@@ -206,7 +201,7 @@ public class RowLevelSecurityExample
         var owner2Docs = dbContextOwner2.MyDocuments.ToList();
 
         // Assert - Can see public documents from other owners
-        Assert.AreEqual(1, owner2Docs.Count, "Should see public documents");
+        Assert.HasCount(1, owner2Docs, "Should see public documents");
         Assert.IsTrue(owner2Docs[0].IsPublic);
         Assert.AreEqual(owner1, owner2Docs[0].OwnerId, "Document owned by different user but is public");
     }
@@ -231,8 +226,8 @@ public class RowLevelSecurityExample
         var allDocs = dbContext.AllDocumentsIncludingDeleted.ToList();
 
         // Assert
-        Assert.AreEqual(0, visibleDocs.Count, "Soft-deleted documents should not appear in queries");
-        Assert.AreEqual(1, allDocs.Count, "Admin query should see deleted documents");
+        Assert.IsEmpty(visibleDocs, "Soft-deleted documents should not appear in queries");
+        Assert.HasCount(1, allDocs, "Admin query should see deleted documents");
         Assert.IsNotNull(allDocs[0].DeletedOn);
         Assert.AreEqual(deleterId, allDocs[0].DeletedBy, "Should track who deleted");
     }
@@ -258,8 +253,8 @@ public class RowLevelSecurityExample
         var tenant2Docs = dbContext.DocumentsByPartition(tenant2.ToString()).ToList();
 
         // Assert
-        Assert.AreEqual(1, tenant1Docs.Count);
-        Assert.AreEqual(0, tenant2Docs.Count, "Different partition");
+        Assert.HasCount(1, tenant1Docs);
+        Assert.IsEmpty(tenant2Docs, "Different partition");
         Assert.AreEqual(tenant1.ToString(), doc1.PartitionKey);
         Assert.AreEqual(tenant2.ToString(), doc2.PartitionKey);
     }
@@ -295,11 +290,11 @@ public class RowLevelSecurityExample
 
         // Assert - RLS still applies
         var visibleDocs = dbContext.Documents.ToList();
-        Assert.AreEqual(0, visibleDocs.Count, "Deleted documents not visible");
+        Assert.IsEmpty(visibleDocs, "Deleted documents not visible");
 
         // Assert - Admin can see full audit trail
         var allDocs = dbContext.AllDocumentsIncludingDeleted.ToList();
-        Assert.AreEqual(1, allDocs.Count);
+        Assert.HasCount(1, allDocs);
         Assert.AreEqual(creatorId, allDocs[0].CreatedBy);
         Assert.AreEqual(editorId, allDocs[0].ModifiedBy);
         Assert.AreEqual(deleterId, allDocs[0].DeletedBy);
@@ -334,15 +329,15 @@ public class RowLevelSecurityExample
 
         // Act & Assert - User 1 in Tenant 1
         var t1u1Docs = dbContext1U1.MyDocuments.ToList();
-        Assert.AreEqual(2, t1u1Docs.Count, "Should see own doc + public doc in tenant");
+        Assert.HasCount(2, t1u1Docs, "Should see own doc + public doc in tenant");
 
         // Act & Assert - User 2 in Tenant 1
         var t1u2Docs = dbContext1U2.MyDocuments.ToList();
-        Assert.AreEqual(1, t1u2Docs.Count, "Should only see public doc");
+        Assert.HasCount(1, t1u2Docs, "Should only see public doc");
 
         // Act & Assert - User 1 in Tenant 2
         var t2u1Docs = dbContext2U1.MyDocuments.ToList();
-        Assert.AreEqual(1, t2u1Docs.Count, "Should see own doc in tenant 2, but not tenant 1 docs");
+        Assert.HasCount(1, t2u1Docs, "Should see own doc in tenant 2, but not tenant 1 docs");
     }
 
     [TestMethod]
@@ -377,7 +372,7 @@ public class RowLevelSecurityExample
         {
             DataSubject = personalDoc.OwnerId,
             Tenant = personalDoc.TenantId,
-            PartitionKey = personalDoc.PartitionKey,
+            personalDoc.PartitionKey,
             Created = new { When = personalDoc.CreatedOn, By = personalDoc.CreatedBy },
             Modified = new { When = personalDoc.ModifiedOn, By = personalDoc.ModifiedBy },
             Deleted = new { When = personalDoc.DeletedOn, By = personalDoc.DeletedBy }
@@ -439,4 +434,5 @@ public class RowLevelSecurityExample
     }
 
     #endregion
+#pragma warning restore CA1822
 }

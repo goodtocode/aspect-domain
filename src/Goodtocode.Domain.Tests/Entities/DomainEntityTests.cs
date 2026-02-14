@@ -17,15 +17,10 @@ public sealed class DomainEntityTests
             : base(id, partitionKey, createdOn, timestamp) { }
     }
 
-    private sealed class TestEvent : IDomainEvent<TestEntity>
+    private sealed class TestEvent(DomainEntityTests.TestEntity item) : IDomainEvent<TestEntity>
     {
-        public TestEntity Item { get; set; }
+        public TestEntity Item { get; set; } = item;
         public DateTime OccurredOn { get; set; } = DateTime.UtcNow;
-
-        public TestEvent(TestEntity item)
-        {
-            Item = item;
-        }
     }
 
     [TestMethod]
@@ -138,8 +133,8 @@ public sealed class DomainEntityTests
         var afterCreation = DateTimeOffset.UtcNow;
 
         // Assert
-        Assert.IsTrue(entity.Timestamp >= beforeCreation);
-        Assert.IsTrue(entity.Timestamp <= afterCreation);
+        Assert.IsGreaterThanOrEqualTo(beforeCreation, entity.Timestamp);
+        Assert.IsLessThanOrEqualTo(afterCreation, entity.Timestamp);
     }
 
     [TestMethod]
@@ -170,14 +165,14 @@ public sealed class DomainEntityTests
         entity.AddDomainEvent(evt);
 
         // Assert
-        Assert.AreEqual(1, entity.DomainEvents.Count);
+        Assert.HasCount(1, entity.DomainEvents);
         Assert.AreSame(evt, entity.DomainEvents[0]);
 
         // Act
         entity.ClearDomainEvents();
 
         // Assert
-        Assert.AreEqual(0, entity.DomainEvents.Count);
+        Assert.IsEmpty(entity.DomainEvents);
     }
 
     [TestMethod]
@@ -193,7 +188,7 @@ public sealed class DomainEntityTests
         entity.AddDomainEvent(evt2);
 
         // Assert
-        Assert.AreEqual(2, entity.DomainEvents.Count);
+        Assert.HasCount(2, entity.DomainEvents);
         Assert.AreSame(evt1, entity.DomainEvents[0]);
         Assert.AreSame(evt2, entity.DomainEvents[1]);
     }
@@ -216,7 +211,7 @@ public sealed class DomainEntityTests
 
         // Assert
         Assert.IsNotNull(entity.DomainEvents);
-        Assert.AreEqual(0, entity.DomainEvents.Count);
+        Assert.IsEmpty(entity.DomainEvents);
     }
 
     [TestMethod]
@@ -229,15 +224,15 @@ public sealed class DomainEntityTests
 
         // Act & Assert - First round
         entity.AddDomainEvent(evt1);
-        Assert.AreEqual(1, entity.DomainEvents.Count);
+        Assert.HasCount(1, entity.DomainEvents);
         entity.ClearDomainEvents();
-        Assert.AreEqual(0, entity.DomainEvents.Count);
+        Assert.IsEmpty(entity.DomainEvents);
 
         // Act & Assert - Second round
         entity.AddDomainEvent(evt2);
-        Assert.AreEqual(1, entity.DomainEvents.Count);
+        Assert.HasCount(1, entity.DomainEvents);
         entity.ClearDomainEvents();
-        Assert.AreEqual(0, entity.DomainEvents.Count);
+        Assert.IsEmpty(entity.DomainEvents);
     }
 
     [TestMethod]
@@ -255,7 +250,7 @@ public sealed class DomainEntityTests
         entity.AddDomainEvent(evt3);
 
         // Assert
-        Assert.AreEqual(3, entity.DomainEvents.Count);
+        Assert.HasCount(3, entity.DomainEvents);
         Assert.AreSame(evt1, entity.DomainEvents[0]);
         Assert.AreSame(evt2, entity.DomainEvents[1]);
         Assert.AreSame(evt3, entity.DomainEvents[2]);
@@ -274,7 +269,7 @@ public sealed class DomainEntityTests
         entity.MarkDeleted();
 
         // Assert
-        Assert.AreEqual(1, entity.DomainEvents.Count, "Domain events should not be affected by audit field updates");
+        Assert.HasCount(1, entity.DomainEvents, "Domain events should not be affected by audit field updates");
         Assert.AreSame(evt, entity.DomainEvents[0]);
     }
 
@@ -400,7 +395,7 @@ public sealed class DomainEntityTests
         entity.AddDomainEvent(domainEvent);
 
         // Assert
-        Assert.AreEqual(1, entity.DomainEvents.Count);
+        Assert.HasCount(1, entity.DomainEvents);
         var eventFromEntity = entity.DomainEvents[0];
         Assert.AreEqual(entity, eventFromEntity.Item);
         Assert.AreEqual(occurredOn, eventFromEntity.OccurredOn, "Domain event OccurredOn should match the set value");
@@ -452,7 +447,9 @@ public sealed class DomainEntityTests
 
         // Assert
         Assert.IsNotNull(secondModified);
+#pragma warning disable MSTEST0037 // Use proper 'Assert' methods
         Assert.IsTrue(secondModified > firstModified, "ModifiedOn should be updated to a more recent value");
+#pragma warning restore MSTEST0037 // Use proper 'Assert' methods
     }
 
     [TestMethod]

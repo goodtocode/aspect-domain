@@ -75,50 +75,30 @@ public class CommandHandlerWithEventsExample
     /// <summary>
     /// Event raised when a person is created
     /// </summary>
-    private sealed class PersonCreatedEvent : IDomainEvent<Person>
+    private sealed class PersonCreatedEvent(CommandHandlerWithEventsExample.Person person) : IDomainEvent<Person>
     {
-        public Person Item { get; }
-        public DateTime OccurredOn { get; }
-
-        public PersonCreatedEvent(Person person)
-        {
-            Item = person;
-            OccurredOn = DateTime.UtcNow;
-        }
+        public Person Item { get; } = person;
+        public DateTime OccurredOn { get; } = DateTime.UtcNow;
     }
 
     /// <summary>
     /// Event raised when a person is verified
     /// </summary>
-    private sealed class PersonVerifiedEvent : IDomainEvent<Person>
+    private sealed class PersonVerifiedEvent(CommandHandlerWithEventsExample.Person person) : IDomainEvent<Person>
     {
-        public Person Item { get; }
-        public DateTime OccurredOn { get; }
-
-        public PersonVerifiedEvent(Person person)
-        {
-            Item = person;
-            OccurredOn = DateTime.UtcNow;
-        }
+        public Person Item { get; } = person;
+        public DateTime OccurredOn { get; } = DateTime.UtcNow;
     }
 
     /// <summary>
     /// Event raised when a person's email changes
     /// </summary>
-    private sealed class PersonEmailChangedEvent : IDomainEvent<Person>
+    private sealed class PersonEmailChangedEvent(CommandHandlerWithEventsExample.Person person, string oldEmail, string newEmail) : IDomainEvent<Person>
     {
-        public Person Item { get; }
-        public DateTime OccurredOn { get; }
-        public string OldEmail { get; }
-        public string NewEmail { get; }
-
-        public PersonEmailChangedEvent(Person person, string oldEmail, string newEmail)
-        {
-            Item = person;
-            OccurredOn = DateTime.UtcNow;
-            OldEmail = oldEmail;
-            NewEmail = newEmail;
-        }
+        public Person Item { get; } = person;
+        public DateTime OccurredOn { get; } = DateTime.UtcNow;
+        public string OldEmail { get; } = oldEmail;
+        public string NewEmail { get; } = newEmail;
     }
 
     #endregion
@@ -158,7 +138,7 @@ public class CommandHandlerWithEventsExample
     /// </summary>
     private sealed class InMemoryDbContext : IAppDbContext
     {
-        public ICollection<Person> Persons { get; } = new List<Person>();
+        public ICollection<Person> Persons { get; } = [];
 
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
@@ -317,9 +297,7 @@ public class CommandHandlerWithEventsExample
         public async Task Handle(VerifyPersonCommand command)
         {
             // 1. Load entity from repository
-            var person = _dbContext.Persons.FirstOrDefault(p => p.Id == command.PersonId);
-            if (person == null)
-                throw new InvalidOperationException($"Person {command.PersonId} not found");
+            var person = _dbContext.Persons.FirstOrDefault(p => p.Id == command.PersonId) ?? throw new InvalidOperationException($"Person {command.PersonId} not found");
 
             // 2. Execute domain logic (this adds PersonVerifiedEvent)
             person.Verify();
@@ -376,7 +354,7 @@ public class CommandHandlerWithEventsExample
         var personId = await handler.Handle(command);
 
         // Assert - Verify entity was created
-        Assert.AreEqual(1, dbContext.Persons.Count);
+        Assert.HasCount(1, dbContext.Persons);
         var person = dbContext.Persons.First();
         Assert.AreEqual("John", person.FirstName);
         Assert.AreEqual("Doe", person.LastName);
@@ -386,8 +364,8 @@ public class CommandHandlerWithEventsExample
         Assert.AreNotEqual(Guid.Empty, person.TenantId);
 
         // Assert - Verify event was published to service bus
-        Assert.AreEqual(1, serviceBus.PublishedMessages.Count);
-        Assert.IsTrue(serviceBus.PublishedMessages[0].Contains("PersonCreatedEvent"));
+        Assert.HasCount(1, serviceBus.PublishedMessages);
+        Assert.Contains("PersonCreatedEvent", serviceBus.PublishedMessages[0]);
     }
 
     [TestMethod]
@@ -436,9 +414,9 @@ public class CommandHandlerWithEventsExample
         Assert.AreEqual("jane.smith@example.com", person.Email); // Email normalized
 
         // Assert - Verify BOTH events were published to service bus
-        Assert.AreEqual(2, serviceBus.PublishedMessages.Count);
-        Assert.IsTrue(serviceBus.PublishedMessages.Any(m => m.Contains("PersonVerifiedEvent")));
-        Assert.IsTrue(serviceBus.PublishedMessages.Any(m => m.Contains("PersonEmailChangedEvent")));
+        Assert.HasCount(2, serviceBus.PublishedMessages);
+        Assert.Contains(m => m.Contains("PersonVerifiedEvent"), serviceBus.PublishedMessages);
+        Assert.Contains(m => m.Contains("PersonEmailChangedEvent"), serviceBus.PublishedMessages);
     }
 
     [TestMethod]

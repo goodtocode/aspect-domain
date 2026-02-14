@@ -44,7 +44,7 @@ public sealed class DomainEventTests
         entity.AddDomainEvent(evt);
 
         // Assert
-        Assert.AreEqual(1, entity.DomainEvents.Count);
+        Assert.HasCount(1, entity.DomainEvents);
         Assert.AreSame(evt, entity.DomainEvents[0]);
     }
 
@@ -60,6 +60,6 @@ public sealed class DomainEventTests
         entity.ClearDomainEvents();
 
         // Assert
-        Assert.AreEqual(0, entity.DomainEvents.Count);
+        Assert.IsEmpty(entity.DomainEvents);
     }
 }
