@@ -270,8 +270,8 @@ public sealed class DomainEntityTests
         entity.AddDomainEvent(evt);
 
         // Act
-        entity.SetModifiedOn(DateTime.UtcNow);
-        entity.SetDeletedOn(DateTime.UtcNow);
+        entity.MarkModified();
+        entity.MarkDeleted();
 
         // Assert
         Assert.AreEqual(1, entity.DomainEvents.Count, "Domain events should not be affected by audit field updates");
@@ -404,5 +404,117 @@ public sealed class DomainEntityTests
         var eventFromEntity = entity.DomainEvents[0];
         Assert.AreEqual(entity, eventFromEntity.Item);
         Assert.AreEqual(occurredOn, eventFromEntity.OccurredOn, "Domain event OccurredOn should match the set value");
+    }
+
+    [TestMethod]
+    public void MarkModifiedSetsModifiedOn()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+
+        // Act
+        entity.MarkModified();
+
+        // Assert
+        Assert.IsNotNull(entity.ModifiedOn);
+    }
+
+    [TestMethod]
+    public void MarkModifiedSetsModifiedOnToUtcNow()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+        Assert.IsNull(entity.ModifiedOn, "ModifiedOn should be null initially");
+
+        // Act
+        var before = DateTime.UtcNow;
+        entity.MarkModified();
+        var after = DateTime.UtcNow;
+
+        // Assert
+        Assert.IsNotNull(entity.ModifiedOn, "ModifiedOn should be set after MarkModified");
+        Assert.IsTrue(entity.ModifiedOn >= before && entity.ModifiedOn <= after, "ModifiedOn should be set to a value between before and after");
+    }
+
+    [TestMethod]
+    public void MarkModifiedUpdatesModifiedOnToMoreRecentValue()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+        entity.MarkModified();
+        var firstModified = entity.ModifiedOn;
+        Assert.IsNotNull(firstModified);
+
+        // Act
+        System.Threading.Thread.Sleep(10); // Ensure time passes
+        entity.MarkModified();
+        var secondModified = entity.ModifiedOn;
+
+        // Assert
+        Assert.IsNotNull(secondModified);
+        Assert.IsTrue(secondModified > firstModified, "ModifiedOn should be updated to a more recent value");
+    }
+
+    [TestMethod]
+    public void MarkDeletedSetsDeletedOn()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+
+        // Act
+        entity.MarkDeleted();
+
+        // Assert
+        Assert.IsNotNull(entity.DeletedOn);
+    }
+
+    [TestMethod]
+    public void MarkDeletedSetsDeletedOnToUtcNowIfNull()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+        Assert.IsNull(entity.DeletedOn, "DeletedOn should be null initially");
+
+        // Act
+        var before = DateTime.UtcNow;
+        entity.MarkDeleted();
+        var after = DateTime.UtcNow;
+
+        // Assert
+        Assert.IsNotNull(entity.DeletedOn, "DeletedOn should be set after MarkDeleted");
+        Assert.IsTrue(entity.DeletedOn >= before && entity.DeletedOn <= after, "DeletedOn should be set to a value between before and after");
+    }
+
+    [TestMethod]
+    public void MarkDeletedDoesNotOverwriteExistingDeletedOn()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+        entity.MarkDeleted();
+        var firstDeletedOn = entity.DeletedOn;
+        Assert.IsNotNull(firstDeletedOn);
+
+        // Act
+        System.Threading.Thread.Sleep(10); // Ensure time passes
+        entity.MarkDeleted();
+        var secondDeletedOn = entity.DeletedOn;
+
+        // Assert
+        Assert.AreEqual(firstDeletedOn, secondDeletedOn, "DeletedOn should not be overwritten if already set");
+    }
+
+    [TestMethod]
+    public void MarkUndeletedClearsDeletedOn()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+        entity.MarkDeleted();
+        Assert.IsNotNull(entity.DeletedOn);
+
+        // Act
+        entity.MarkUndeleted();
+
+        // Assert
+        Assert.IsNull(entity.DeletedOn);
     }
 }

@@ -79,4 +79,51 @@ public abstract class SecuredEntity<TModel> : DomainEntity<TModel>, ISecuredEnti
     {
         return (TEntity)Activator.CreateInstance(typeof(TEntity), id, ownerId, tenantId)!;
     }
+
+    /// <summary>
+    /// Sets the identifier of the user who created the entity.
+    /// </summary>
+    /// <param name="ownerId">The user identifier.</param>
+    public void MarkCreated(Guid ownerId)
+    {
+        if(CreatedBy != Guid.Empty)
+            return;
+        CreatedBy = ownerId;
+    }
+
+    /// <summary>
+    /// Sets the identifier of the user who last modified the entity.
+    /// </summary>
+    /// <param name="ownerId">The user identifier.</param>
+    public void MarkModified(Guid ownerId) => ModifiedBy = ownerId;
+
+    /// <summary>
+    /// Sets the identifier of the user who deleted the entity.
+    /// </summary>
+    /// <param name="ownerId">The user identifier.</param>
+    public void MarkDeleted(Guid ownerId)
+    {
+        if (DeletedBy.HasValue)
+            return;
+        MarkDeleted();
+        DeletedBy = ownerId;        
+    }
+
+    /// <summary>
+    /// Changes the owner identifier for the entity.
+    /// </summary>
+    /// <param name="newOwnerId">The new owner identifier (ObjectId/OID).</param>
+    public void ChangeOwner(Guid newOwnerId)
+    {
+        OwnerId = newOwnerId;
+    }
+
+    /// <summary>
+    /// Changes the tenant identifier for the entity.
+    /// </summary>
+    /// <param name="newTenantId">The new tenant identifier (TID).</param>
+    public void ChangeTenant(Guid newTenantId)
+    {
+        TenantId = newTenantId;
+    }
 }

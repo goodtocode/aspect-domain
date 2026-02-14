@@ -47,7 +47,7 @@ public class CommandHandlerWithEventsExample
             if (!IsVerified)
             {
                 IsVerified = true;
-                this.SetModifiedOn(DateTime.UtcNow);
+                this.MarkModified();
 
                 // Add domain event for verification
                 AddDomainEvent(new PersonVerifiedEvent(this));
@@ -60,7 +60,7 @@ public class CommandHandlerWithEventsExample
             {
                 var oldEmail = Email;
                 Email = newEmail;
-                this.SetModifiedOn(DateTime.UtcNow);
+                this.MarkModified();
 
                 // Add domain event for email change
                 AddDomainEvent(new PersonEmailChangedEvent(this, oldEmail, newEmail));

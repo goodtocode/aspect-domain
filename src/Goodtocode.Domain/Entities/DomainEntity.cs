@@ -110,6 +110,30 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     }
 
     /// <summary>
+    /// Sets the last modification date and time of the entity to the current UTC time.
+    /// </summary>
+    public void MarkModified() => ModifiedOn = DateTime.UtcNow;
+
+    /// <summary>
+    /// Sets the deletion date and time of the entity to the current UTC time.
+    /// </summary>
+    /// <param name="value">The deletion date and time.</param>
+    public void MarkDeleted()
+    {
+        if (DeletedOn == null)
+            DeletedOn = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Marks the entity as not deleted by clearing the deletion date and time.
+    /// </summary>
+    public void MarkUndeleted()
+    {
+        if (DeletedOn != null)
+            DeletedOn = null;
+    }
+
+    /// <summary>
     /// Determines whether the specified object is equal to the current entity.
     /// </summary>
     /// <param name="obj">The object to compare with the current entity.</param>
@@ -173,7 +197,6 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
             return hash;
         }
     }
-
 
     /// <summary>
     /// Gets the real type of the entity, accounting for proxy types.

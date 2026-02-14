@@ -36,6 +36,82 @@ public class SecuredEntityAuditTests
 
     #endregion
 
+    #region Deletion and Undeletion Tests
+
+    [TestMethod]
+    public void MarkDeletedShouldBeForwardOnly()
+    {
+        // Arrange
+        var entity = new TestSecuredEntity(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "Test Entity");
+        // Act
+        entity.MarkDeleted();
+        var deletedOnFirst = entity.DeletedOn;
+        entity.MarkDeleted(); // Should not overwrite
+
+        // Assert
+        Assert.AreEqual(deletedOnFirst, entity.DeletedOn, "DeletedOn should not be overwritten by subsequent deletes");
+    }
+
+    [TestMethod]
+    public void MarkUndeletedShouldRestoreEntity()
+    {
+        // Arrange
+        var entity = new TestSecuredEntity(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "Test Entity");
+        entity.MarkDeleted();
+
+        // Act
+        entity.MarkUndeleted();
+
+        // Assert
+        Assert.IsNull(entity.DeletedOn, "DeletedOn should be null after MarkUndeleted");
+    }
+
+    [TestMethod]
+    public void MarkUndeletedWhenNotDeletedShouldBeNoOp()
+    {
+        // Arrange
+        var entity = new TestSecuredEntity(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "Test Entity");
+
+        // Act
+        entity.MarkUndeleted();
+
+        // Assert
+        Assert.IsNull(entity.DeletedOn, "MarkUndeleted should be a no-op if not deleted");
+    }
+
+    [TestMethod]
+    public void MarkDeletedAfterUndeleteShouldWork()
+    {
+        // Arrange
+        var entity = new TestSecuredEntity(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "Test Entity");
+        entity.MarkDeleted();
+        entity.MarkUndeleted();
+
+        // Act
+        entity.MarkDeleted();
+
+        // Assert
+        Assert.IsNotNull(entity.DeletedOn, "Should allow re-deletion after undeletion");
+    }
+
+    #endregion
+
     #region CreatedBy Tests
 
     [TestMethod]
@@ -50,7 +126,7 @@ public class SecuredEntityAuditTests
             "Test Entity");
 
         // Act
-        entity.SetCreatedBy(userId);
+        entity.MarkCreated(userId);
 
         // Assert
         Assert.AreEqual(userId, entity.CreatedBy);
@@ -68,7 +144,7 @@ public class SecuredEntityAuditTests
             "Test Entity");
 
         // Act
-        entity.SetCreatedBy(userId);
+        entity.MarkCreated(userId);
 
         // Assert
         Assert.AreNotEqual(Guid.Empty, entity.CreatedBy);
@@ -85,10 +161,12 @@ public class SecuredEntityAuditTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             "Test Entity");
-        entity.SetCreatedBy(creatorId);
+        entity.MarkCreated(creatorId);
 
         // Act
+
         entity.UpdateName("Modified Name");
+        entity.MarkModified();
         entity.SetModifiedBy(modifierId);
 
         // Assert
@@ -126,6 +204,7 @@ public class SecuredEntityAuditTests
             "Test Entity");
 
         // Act
+        entity.MarkModified();
         entity.SetModifiedBy(userId);
 
         // Assert
@@ -145,10 +224,9 @@ public class SecuredEntityAuditTests
             "Test Entity");
 
         // Act
-        entity.SetModifiedOn(DateTime.UtcNow);
+        entity.MarkModified();
         entity.SetModifiedBy(user1);
-        
-        entity.SetModifiedOn(DateTime.UtcNow.AddHours(1));
+        entity.MarkModified();
         entity.SetModifiedBy(user2);
 
         // Assert
@@ -164,6 +242,7 @@ public class SecuredEntityAuditTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             "Test Entity");
+        entity.MarkModified();
         entity.SetModifiedBy(Guid.NewGuid());
 
         // Act
@@ -203,7 +282,7 @@ public class SecuredEntityAuditTests
             "Test Entity");
 
         // Act
-        entity.SetDeletedOn(DateTime.UtcNow);
+        entity.MarkDeleted();
         entity.SetDeletedBy(userId);
 
         // Assert
@@ -223,7 +302,7 @@ public class SecuredEntityAuditTests
             "Test Entity");
 
         // Act - Simulate soft delete
-        entity.SetDeletedOn(DateTime.UtcNow);
+        entity.MarkDeleted();
         entity.SetDeletedBy(deleterId);
 
         // Assert
@@ -330,15 +409,15 @@ public class SecuredEntityAuditTests
             ownerId,
             tenantId,
             "Initial Name");
-        entity.SetCreatedBy(creatorId);
+        entity.MarkCreated(creatorId);
 
         // Act - Modify
         entity.UpdateName("Modified Name");
-        entity.SetModifiedOn(DateTime.UtcNow);
+        entity.MarkModified();
         entity.SetModifiedBy(modifierId);
 
         // Act - Delete
-        entity.SetDeletedOn(DateTime.UtcNow);
+        entity.MarkDeleted();
         entity.SetDeletedBy(deleterId);
 
         // Assert - Complete audit trail
@@ -364,14 +443,14 @@ public class SecuredEntityAuditTests
             user1,
             tenant1,
             "Tenant 1 Data");
-        entity1.SetCreatedBy(user1);
+        entity1.MarkCreated(user1);
 
         var entity2 = new TestSecuredEntity(
             Guid.NewGuid(),
             user2,
             tenant2,
             "Tenant 2 Data");
-        entity2.SetCreatedBy(user2);
+        entity2.MarkCreated(user2);
 
         // Assert - Data isolation
         Assert.AreEqual(tenant1.ToString(), entity1.PartitionKey);
@@ -394,7 +473,7 @@ public class SecuredEntityAuditTests
             ownerId,
             tenantId,
             "Secure Data");
-        entity.SetCreatedBy(ownerId);
+        entity.MarkCreated(ownerId);
 
         // Assert - Fields available for RLS filtering
         Assert.AreEqual(tenantId, entity.TenantId, "TenantId required for tenant-level RLS");
@@ -424,10 +503,10 @@ public class SecuredEntityAuditTests
             "Sensitive Data");
 
         // Act - Track who accessed/modified data
-        entity.SetCreatedBy(dataControllerUserId);
+        entity.MarkCreated(dataControllerUserId);
 
         var auditorUserId = Guid.NewGuid();
-        entity.SetModifiedOn(DateTime.UtcNow.AddDays(1));
+        entity.MarkModified();
         entity.SetModifiedBy(auditorUserId);
 
         // Assert - Complete audit trail for compliance
@@ -450,10 +529,10 @@ public class SecuredEntityAuditTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             "To Be Deleted");
-        entity.SetCreatedBy(creatorId);
+        entity.MarkCreated(creatorId);
 
         // Act - Soft delete
-        entity.SetDeletedOn(DateTime.UtcNow);
+        entity.MarkDeleted();
         entity.SetDeletedBy(deleterId);
 
         // Assert - Audit trail preserved after deletion
@@ -512,8 +591,10 @@ public class SecuredEntityAuditTests
             "Test Entity");
 
         // Act - Same user performs all operations
-        entity.SetCreatedBy(userId);
+        entity.MarkCreated(userId);
+        entity.MarkModified();
         entity.SetModifiedBy(userId);
+        entity.MarkDeleted();
         entity.SetDeletedBy(userId);
 
         // Assert

@@ -1,28 +1,20 @@
 ﻿namespace Goodtocode.Domain.Entities;
 
-public interface ISecuredEntity<TModel> : IDomainEntity<TModel>
+/// <summary>
+/// Represents a secured domain entity that is associated with an owner and a tenant.
+/// Provides ownership and tenancy information for access control and multi-tenancy scenarios.
+/// </summary>
+public interface ISecuredEntity<TModel> : IDomainEntity<TModel>, ISecurable
 {
     /// <summary>
-    /// Gets the owner identifier (formerly OwnerId, typically OID).
+    /// Gets the owner identifier.
+    /// This is typically the unique identifier (OID) of the user or entity that owns this resource.
     /// </summary>
     Guid OwnerId { get; }
+
     /// <summary>
-    /// Gets the tenant identifier (TID).
+    /// Gets the tenant identifier.
+    /// This is the unique identifier (TID) of the tenant or organization to which this resource belongs.
     /// </summary>
     Guid TenantId { get; }
-
-    /// <summary>
-    /// Gets the unique identifier of the user who created the entity.
-    /// </summary>
-    Guid CreatedBy { get; }
-
-    /// <summary>
-    /// Gets the identifier of the user who last modified this entity.
-    /// </summary>
-    Guid? ModifiedBy { get; }
-
-    /// <summary>
-    /// Gets the identifier of the user who deleted this entity, or null if not deleted.
-    /// </summary>
-    Guid? DeletedBy { get; }
 }

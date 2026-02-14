@@ -6,7 +6,7 @@ namespace Goodtocode.Domain.Entities;
 /// Defines the contract for a domain entity with auditing and domain event support.
 /// </summary>
 /// <typeparam name="TModel">The type of the domain model.</typeparam>
-    public interface IDomainEntity<TModel>
+    public interface IDomainEntity<TModel>: IAuditable
 {
     /// <summary>
     /// Gets the unique identifier for the entity.
@@ -17,21 +17,6 @@ namespace Goodtocode.Domain.Entities;
     /// Gets the partition key used for data partitioning in distributed storage systems.
     /// </summary>
     string PartitionKey { get; }
-
-    /// <summary>
-    /// Gets the date and time when the entity was created.
-    /// </summary>
-    DateTime CreatedOn { get; }
-
-    /// <summary>
-    /// Gets the date and time when the entity was last modified, or null if never modified.
-    /// </summary>
-    DateTime? ModifiedOn { get; }
-
-    /// <summary>
-    /// Gets the date and time when this entity was soft-deleted, or null if not deleted.
-    /// </summary>
-    DateTime? DeletedOn { get; }
 
     /// <summary>
     /// Gets the timestamp of the last operation on the entity.

@@ -37,14 +37,14 @@ public class RowLevelSecurityExample
         public void UpdateContent(string newContent, Guid modifiedBy)
         {
             Content = newContent;
-            this.SetModifiedOn(DateTime.UtcNow);
-            this.SetModifiedBy(modifiedBy);
+            this.MarkModified();
+            this.MarkModified(modifiedBy);
         }
 
         public void SoftDelete(Guid deletedBy)
         {
-            this.SetDeletedOn(DateTime.UtcNow);
-            this.SetDeletedBy(deletedBy);
+            this.MarkDeleted();
+            this.MarkDeleted(deletedBy);
         }
     }
 
@@ -137,11 +137,11 @@ public class RowLevelSecurityExample
 
         // Create documents for different tenants
         var doc1 = new Document(Guid.NewGuid(), user1, tenant1, "Tenant 1 Doc", "Secret content 1");
-        doc1.SetCreatedBy(user1);
+        doc1.MarkCreated(user1);
         dbContext1.Add(doc1);
 
         var doc2 = new Document(Guid.NewGuid(), user2, tenant2, "Tenant 2 Doc", "Secret content 2");
-        doc2.SetCreatedBy(user2);
+        doc2.MarkCreated(user2);
         dbContext2.Add(doc2);
 
         // Act - Query with RLS filters
@@ -167,11 +167,11 @@ public class RowLevelSecurityExample
 
         // Create documents with different owners in same tenant
         var doc1 = new Document(Guid.NewGuid(), owner1, tenantId, "Owner 1 Doc", "Private content", false);
-        doc1.SetCreatedBy(owner1);
+        doc1.MarkCreated(owner1);
         dbContextOwner1.Add(doc1);
 
         var doc2 = new Document(Guid.NewGuid(), owner2, tenantId, "Owner 2 Doc", "Private content", false);
-        doc2.SetCreatedBy(owner2);
+        doc2.MarkCreated(owner2);
         dbContextOwner1.Add(doc2);
 
         // Act - Query with owner filter
@@ -195,11 +195,11 @@ public class RowLevelSecurityExample
 
         // Create public document by owner1
         var publicDoc = new Document(Guid.NewGuid(), owner1, tenantId, "Public Doc", "Public content", true);
-        publicDoc.SetCreatedBy(owner1);
+        publicDoc.MarkCreated(owner1);
         dbContextOwner2.Add(publicDoc);
 
         var privateDoc = new Document(Guid.NewGuid(), owner1, tenantId, "Private Doc", "Private content", false);
-        privateDoc.SetCreatedBy(owner1);
+        privateDoc.MarkCreated(owner1);
         dbContextOwner2.Add(privateDoc);
 
         // Act - Query as owner2
@@ -222,7 +222,7 @@ public class RowLevelSecurityExample
         var dbContext = new SecuredDbContext(userId, tenantId);
 
         var doc = new Document(Guid.NewGuid(), userId, tenantId, "To Delete", "Content");
-        doc.SetCreatedBy(userId);
+        doc.MarkCreated(userId);
         dbContext.Add(doc);
 
         // Act - Soft delete
@@ -277,7 +277,7 @@ public class RowLevelSecurityExample
 
         // Act - Create
         var doc = new Document(Guid.NewGuid(), creatorId, tenantId, "Document", "Original content");
-        doc.SetCreatedBy(creatorId);
+        doc.MarkCreated(creatorId);
         dbContext.Add(doc);
 
         // Act - Edit
@@ -321,15 +321,15 @@ public class RowLevelSecurityExample
 
         // Create documents
         var doc1 = new Document(Guid.NewGuid(), tenant1User1, tenant1, "T1U1 Doc", "Content", false);
-        doc1.SetCreatedBy(tenant1User1);
+        doc1.MarkCreated(tenant1User1);
         dbContext1U1.Add(doc1);
 
         var doc2 = new Document(Guid.NewGuid(), tenant1User2, tenant1, "T1U2 Doc", "Content", true); // Public
-        doc2.SetCreatedBy(tenant1User2);
+        doc2.MarkCreated(tenant1User2);
         dbContext1U1.Add(doc2);
 
         var doc3 = new Document(Guid.NewGuid(), tenant2User1, tenant2, "T2U1 Doc", "Content", false);
-        doc3.SetCreatedBy(tenant2User1);
+        doc3.MarkCreated(tenant2User1);
         dbContext2U1.Add(doc3);
 
         // Act & Assert - User 1 in Tenant 1
@@ -366,7 +366,7 @@ public class RowLevelSecurityExample
         typeof(DomainEntity<Document>)
             .GetProperty("CreatedOn")!
             .SetValue(personalDoc, DateTime.UtcNow.AddDays(-100));
-        personalDoc.SetCreatedBy(dataSubjectId);
+        personalDoc.MarkCreated(dataSubjectId);
         dbContext.Add(personalDoc);
 
         // Data processor modifies data
