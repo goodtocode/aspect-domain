@@ -11,12 +11,13 @@ Goodtocode.Domain provides foundational types for building DDD, clean architectu
 - Tests/examples: `net10.0`
 
 ## Features
-- Domain entity base with audit fields (`CreatedOn`, `ModifiedOn`, `DeletedOn`, `CreatedBy`, `ModifiedBy`, `DeletedBy`, `Timestamp`)
+- Domain entity base with audit fields (`CreatedOn`, `ModifiedOn`, `DeletedOn`, `Timestamp`)
 - Domain event pattern and dispatcher (`IDomainEvent`, `IDomainHandler`, `DomainDispatcher`)
 - Equality and identity management for aggregate roots
-- Partition key support for document stores (`PartitionKey`)
-- Secured entity base for multi-tenancy and ownership (`OwnerId`, `TenantId`)
+- Partition key support for document stores (`PartitionKey` defaults to `Id.ToString()`; for secured entities, defaults to `TenantId.ToString()`)
+- Secured entity base for multi-tenancy and ownership (`OwnerId`, `TenantId`, `CreatedBy`, `ModifiedBy`, `DeletedBy`)
 - Extension methods for authorization and ownership queries
+- **Invariant state protection** for audit and security fields (fields are only set if not already set, ensuring consistency and preventing accidental overwrites)
 
 ## Install
 ```bash
@@ -40,8 +41,9 @@ dotnet add package Goodtocode.Domain
    ```
 
 ## Core Concepts
-- `DomainEntity<TModel>`: Base entity with audit fields, identity, and domain event tracking.
-- `SecuredEntity<TModel>`: Adds `OwnerId` and `TenantId`, with `PartitionKey` defaulting to `TenantId.ToString()`.
+- `DomainEntity<TModel>`: Base entity with audit fields (`CreatedOn`, `ModifiedOn`, `DeletedOn`, `Timestamp`), identity (`Id`), partition key, and domain event tracking.
+- `SecuredEntity<TModel>`: Extends `DomainEntity<TModel>` with `OwnerId`, `TenantId`, and audit fields for user actions (`CreatedBy`, `ModifiedBy`, `DeletedBy`). `PartitionKey` defaults to `TenantId.ToString()` for multi-tenant isolation.
+- **Invariant state protection**: Methods like `MarkCreated`, `MarkDeleted`, etc. only set fields if not already set, ensuring entity state is consistent and protected from accidental changes.
 - Domain events: Implement `IDomainEvent<TModel>` and dispatch with `DomainDispatcher`.
 
 ## Key Examples
@@ -55,19 +57,12 @@ public sealed class MyEntity : DomainEntity<MyEntity>
     public string Name { get; private set; } = string.Empty;
     public int Value { get; private set; }
 
-    public static MyEntity Create(Guid id, string name, int value, Guid createdBy)
+    private MyEntity() { }
+
+    public MyEntity(Guid id, string name, int value) : base(id)
     {
-        var entity = new MyEntity
-        {
-            Id = id == Guid.Empty ? Guid.NewGuid() : id,
-            Name = name,
-            Value = value
-        };
-
-        entity.SetCreatedOn(DateTime.UtcNow);
-        entity.SetCreatedBy(createdBy);
-
-        return entity;
+        Name = name;
+        Value = value;
     }
 }
 ```
@@ -82,12 +77,9 @@ public sealed class Document : SecuredEntity<Document>
 
     private Document() { }
 
-    public Document(Guid id, Guid ownerId, Guid tenantId, string title)
-        : base(id, ownerId, tenantId)
+    public Document(Guid id, Guid ownerId, Guid tenantId, string title) : base(id, ownerId, tenantId)
     {
         Title = title;
-        SetCreatedOn(DateTime.UtcNow);
-        SetCreatedBy(ownerId);
     }
 }
 
@@ -97,6 +89,7 @@ var tenantDocuments = queryableDocuments.WhereTenant(tenantId);
 var authorized = queryableDocuments.WhereAuthorized(tenantId, ownerId);
 ```
 
+person.ClearDomainEvents();
 ### 3. Domain Events + Dispatcher
 ```csharp
 using Goodtocode.Domain.Entities;
@@ -110,7 +103,6 @@ public sealed class Person : SecuredEntity<Person>
         : base(id, ownerId, tenantId)
     {
         Email = email;
-        SetCreatedOn(DateTime.UtcNow);
         AddDomainEvent(new PersonCreatedEvent(this));
     }
 }
@@ -137,19 +129,92 @@ public sealed class PersonCreatedHandler : IDomainHandler<PersonCreatedEvent>
 }
 
 // Dispatcher usage (with your DI container)
-var serviceProvider = new ServiceCollection()
-    .AddTransient<IDomainHandler<PersonCreatedEvent>, PersonCreatedHandler>()
-    .BuildServiceProvider();
+var serviceProvider = new ServiceCollection();
+serviceProvider.AddTransient<IDomainHandler<PersonCreatedEvent>, PersonCreatedHandler>();
+serviceProvider.BuildServiceProvider();
 
 var dispatcher = new DomainDispatcher(serviceProvider);
 await dispatcher.DispatchAsync(person.DomainEvents);
 person.ClearDomainEvents();
 ```
 
+
+---
+
+## Integrating with EF Core: Audit & Security Field Automation
+
+To ensure audit and security fields are set correctly and invariant state is protected, you must wire up your `DbContext` to set these fields during the entity lifecycle.
+
+**Example:**
+```csharp
+public class ExampleDbContext : DbContext 
+{ 
+    private readonly ICurrentUserContext _currentUserContext;
+
+    public ExampleDbContext(DbContextOptions options, ICurrentUserContext currentUserContext)
+        : base(options)
+    {
+        _currentUserContext = currentUserContext;
+    }
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SetAuditFields();
+        SetSecurityFields();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    private void SetAuditFields()
+    {
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.Entity is IAuditable auditable)
+            {
+                if (entry.State == EntityState.Modified)
+                {
+                    auditable.MarkModified();
+                }
+                else if (entry.State == EntityState.Deleted)
+                {
+                    auditable.MarkDeleted();
+                    entry.State = EntityState.Modified;
+                }
+            }
+        }
+    }
+
+    private void SetSecurityFields()
+    {
+        if (_currentUserContext is null) return;
+
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.Entity is ISecurable securable)
+            {
+                if (entry.State == EntityState.Added)
+                {
+                    if (securable.OwnerId == Guid.Empty)
+                        securable.ChangeOwner(_currentUserContext.OwnerId);
+                    if (securable.TenantId == Guid.Empty)
+                        securable.ChangeTenant(_currentUserContext.TenantId);
+                }
+            }
+        }
+    }
+}
+```
+
+**Note:**  
+- This pattern should be implemented in your infrastructure layer (not in the domain library).
+- See `Goodtocode.Domain.Tests/Examples/ExampleDbContext.cs` for a working reference
+
+---
+
 ## Complete Examples
 See the fully working examples in the test project:
 - `Goodtocode.Domain.Tests/Examples/RowLevelSecurityExample.cs` (row-level security, audit fields, and partition key usage)
 - `Goodtocode.Domain.Tests/Examples/CommandHandlerWithEventsExample.cs` (command handlers, domain events, dispatcher, and service bus integration)
+- `Goodtocode.Domain.Tests/Examples/ExampleDbContext.cs` (**EF Core integration for audit and security fields**)
 
 ## Technologies
 - [C# .NET](https://docs.microsoft.com/en-us/dotnet/csharp/)
