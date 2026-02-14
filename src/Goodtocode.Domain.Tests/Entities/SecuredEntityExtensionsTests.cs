@@ -6,6 +6,7 @@ namespace Goodtocode.Domain.Tests.Entities;
 [TestClass]
 public sealed class SecuredEntityExtensionsTests
 {
+#pragma warning disable CA1822
     private sealed class TestSecuredEntity : ISecurable
     {
         public Guid OwnerId { get; set; }
@@ -22,7 +23,10 @@ public sealed class SecuredEntityExtensionsTests
         public Guid? DeletedBy { get; set; }
         public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;
 
+
+#pragma warning disable IDE0060 // Remove unused parameter
         public void AddDomainEvent(IDomainEvent<TestSecuredEntity> domainEvent)
+#pragma warning restore IDE0060 // Remove unused parameter
         {
             // No-op for test stub
         }
@@ -92,7 +96,7 @@ public sealed class SecuredEntityExtensionsTests
         var result = entities.WhereOwner(ownerId).ToList();
 
         // Assert
-        Assert.AreEqual(1, result.Count);
+        Assert.HasCount(1, result);
         Assert.AreEqual(ownerId, result[0].OwnerId);
     }
 
@@ -111,7 +115,7 @@ public sealed class SecuredEntityExtensionsTests
         var result = entities.WhereOwner(ownerId).ToList();
 
         // Assert
-        Assert.AreEqual(1, result.Count);
+        Assert.HasCount(1, result);
         Assert.AreEqual(ownerId, result[0].OwnerId);
     }
 
@@ -156,8 +160,9 @@ public sealed class SecuredEntityExtensionsTests
         var result = entities.WhereAuthorized(tenantId, ownerId).ToList();
 
         // Assert
-        Assert.AreEqual(2, result.Count);
-        Assert.IsTrue(result.Any(x => x.OwnerId == ownerId));
-        Assert.IsTrue(result.Any(x => x.TenantId == tenantId));
+        Assert.HasCount(2, result);
+        Assert.Contains(x => x.OwnerId == ownerId, result);
+        Assert.Contains(x => x.TenantId == tenantId, result);
     }
+#pragma warning restore CA1822
 }

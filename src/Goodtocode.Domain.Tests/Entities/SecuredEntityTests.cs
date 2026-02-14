@@ -14,15 +14,10 @@ public sealed class SecuredEntityTests
         public TestSecuredEntity(Guid id, Guid ownerId, Guid tenantId) : base(id, ownerId, tenantId) { }
     }
 
-    private sealed class TestSecuredEvent : IDomainEvent<TestSecuredEntity>
+    private sealed class TestSecuredEvent(SecuredEntityTests.TestSecuredEntity item) : IDomainEvent<TestSecuredEntity>
     {
-        public TestSecuredEntity Item { get; set; }
+        public TestSecuredEntity Item { get; set; } = item;
         public DateTime OccurredOn { get; set; } = DateTime.UtcNow;
-
-        public TestSecuredEvent(TestSecuredEntity item)
-        {
-            Item = item;
-        }
     }
 
     [TestMethod]
@@ -300,14 +295,14 @@ public sealed class SecuredEntityTests
         entity.AddDomainEvent(evt);
 
         // Assert
-        Assert.AreEqual(1, entity.DomainEvents.Count);
+        Assert.HasCount(1, entity.DomainEvents);
         Assert.AreSame(evt, entity.DomainEvents[0]);
 
         // Act
         entity.ClearDomainEvents();
 
         // Assert
-        Assert.AreEqual(0, entity.DomainEvents.Count);
+        Assert.IsEmpty(entity.DomainEvents);
     }
 
     [TestMethod]
@@ -323,7 +318,7 @@ public sealed class SecuredEntityTests
         entity.AddDomainEvent(evt2);
 
         // Assert
-        Assert.AreEqual(2, entity.DomainEvents.Count);
+        Assert.HasCount(2, entity.DomainEvents);
         Assert.AreSame(evt1, entity.DomainEvents[0]);
         Assert.AreSame(evt2, entity.DomainEvents[1]);
     }
@@ -342,7 +337,7 @@ public sealed class SecuredEntityTests
         entity.AddDomainEvent(evt);
 
         // Assert
-        Assert.AreEqual(1, entity.DomainEvents.Count);
+        Assert.HasCount(1, entity.DomainEvents);
         Assert.AreEqual(ownerId, entity.OwnerId);
         Assert.AreEqual(tenantId, entity.TenantId);
         Assert.AreSame(entity, entity.DomainEvents[0].Item);
