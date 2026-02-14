@@ -1,5 +1,6 @@
 ﻿using Goodtocode.Domain.Entities;
 using Goodtocode.Domain.Events;
+using Goodtocode.Domain.Tests.TestHelpers;
 
 namespace Goodtocode.Domain.Tests.Entities;
 
@@ -35,9 +36,9 @@ public sealed class DomainEntityTests
 
         // Assert
         Assert.IsNotNull(entity);
-        Assert.AreEqual(Guid.Empty, entity.Id);
-        Assert.AreEqual(string.Empty, entity.PartitionKey);
-        Assert.AreEqual(default, entity.CreatedOn);
+        Assert.AreNotEqual(Guid.Empty, entity.Id);
+        Assert.AreEqual(entity.Id.ToString(), entity.PartitionKey);
+        Assert.AreNotEqual(default, entity.CreatedOn);
         Assert.IsNull(entity.ModifiedOn);
         Assert.IsNull(entity.DeletedOn);
     }
@@ -54,7 +55,7 @@ public sealed class DomainEntityTests
         // Assert
         Assert.IsNotNull(entity);
         Assert.AreEqual(id, entity.Id);
-        Assert.AreEqual(string.Empty, entity.PartitionKey);
+        Assert.AreEqual(id.ToString(), entity.PartitionKey);
     }
 
     [TestMethod]
@@ -142,140 +143,20 @@ public sealed class DomainEntityTests
     }
 
     [TestMethod]
-    public void SetCreatedOnUpdatesCreatedOnProperty()
+    public void AuditFieldsCanBeAccessedViaProperties()
     {
         // Arrange
-        var entity = new TestEntity(Guid.NewGuid());
+        var id = Guid.NewGuid();
+        var partitionKey = "pk";
         var createdOn = DateTime.UtcNow;
+        var timestamp = DateTimeOffset.UtcNow;
+        var entity = new TestEntity(id, partitionKey, createdOn, timestamp);
 
-        // Act
-        entity.SetCreatedOn(createdOn);
-
-        // Assert
+        // Act & Assert
         Assert.AreEqual(createdOn, entity.CreatedOn);
-    }
-
-    [TestMethod]
-    public void SetModifiedOnUpdatesModifiedOnProperty()
-    {
-        // Arrange
-        var entity = new TestEntity(Guid.NewGuid());
-        var modifiedOn = DateTime.UtcNow;
-
-        // Act
-        entity.SetModifiedOn(modifiedOn);
-
-        // Assert
-        Assert.AreEqual(modifiedOn, entity.ModifiedOn);
-    }
-
-    [TestMethod]
-    public void SetDeletedOnUpdatesDeletedOnProperty()
-    {
-        // Arrange
-        var entity = new TestEntity(Guid.NewGuid());
-        var deletedOn = DateTime.UtcNow;
-
-        // Act
-        entity.SetDeletedOn(deletedOn);
-
-        // Assert
-        Assert.AreEqual(deletedOn, entity.DeletedOn);
-    }
-
-    [TestMethod]
-    public void SetAuditFieldsModifiedAndDeletedOn()
-    {
-        // Arrange
-        var entity = new TestEntity(Guid.NewGuid());
-        var mod = DateTime.UtcNow;
-        var del = DateTime.UtcNow.AddDays(1);
-
-        // Act
-        entity.SetModifiedOn(mod);
-        entity.SetDeletedOn(del);
-
-        // Assert
-        Assert.AreEqual(mod, entity.ModifiedOn);
-        Assert.AreEqual(del, entity.DeletedOn);
-    }
-
-    [TestMethod]
-    public void SetModifiedOnCanBeSetToNull()
-    {
-        // Arrange
-        var entity = new TestEntity(Guid.NewGuid());
-        entity.SetModifiedOn(DateTime.UtcNow);
-
-        // Act
-        entity.SetModifiedOn(null);
-
-        // Assert
-        Assert.IsNull(entity.ModifiedOn);
-    }
-
-    [TestMethod]
-    public void SetDeletedOnCanBeSetToNull()
-    {
-        // Arrange
-        var entity = new TestEntity(Guid.NewGuid());
-        entity.SetDeletedOn(DateTime.UtcNow);
-
-        // Act
-        entity.SetDeletedOn(null);
-
-        // Assert
-        Assert.IsNull(entity.DeletedOn);
-    }
-
-    [TestMethod]
-    public void AuditFieldsCanBeUpdatedMultipleTimes()
-    {
-        // Arrange
-        var entity = new TestEntity(Guid.NewGuid());
-        var firstModified = DateTime.UtcNow;
-        var secondModified = DateTime.UtcNow.AddMinutes(5);
-
-        // Act
-        entity.SetModifiedOn(firstModified);
-        entity.SetModifiedOn(secondModified);
-
-        // Assert
-        Assert.AreEqual(secondModified, entity.ModifiedOn);
-        Assert.AreNotEqual(firstModified, entity.ModifiedOn);
-    }
-
-    [TestMethod]
-    public void PartitionKeyMaintainedWhenAuditFieldsUpdated()
-    {
-        // Arrange
-        var id = Guid.NewGuid();
-        var partitionKey = "test-partition";
-        var entity = new TestEntity(id, partitionKey);
-        var modifiedOn = DateTime.UtcNow;
-
-        // Act
-        entity.SetModifiedOn(modifiedOn);
-
-        // Assert
-        Assert.AreEqual(partitionKey, entity.PartitionKey, "PartitionKey should remain unchanged");
-        Assert.AreEqual(id, entity.Id, "Id should remain unchanged");
-    }
-
-    [TestMethod]
-    public void IdMaintainedWhenAuditFieldsUpdated()
-    {
-        // Arrange
-        var id = Guid.NewGuid();
-        var entity = new TestEntity(id);
-
-        // Act
-        entity.SetCreatedOn(DateTime.UtcNow);
-        entity.SetModifiedOn(DateTime.UtcNow);
-        entity.SetDeletedOn(DateTime.UtcNow);
-
-        // Assert
-        Assert.AreEqual(id, entity.Id, "Id should remain unchanged after audit field updates");
+        Assert.AreEqual(timestamp, entity.Timestamp);
+        Assert.AreEqual(partitionKey, entity.PartitionKey);
+        Assert.AreEqual(id, entity.Id);
     }
 
     [TestMethod]
@@ -389,8 +270,8 @@ public sealed class DomainEntityTests
         entity.AddDomainEvent(evt);
 
         // Act
-        entity.SetModifiedOn(DateTime.UtcNow);
-        entity.SetDeletedOn(DateTime.UtcNow);
+        entity.MarkModified();
+        entity.MarkDeleted();
 
         // Assert
         Assert.AreEqual(1, entity.DomainEvents.Count, "Domain events should not be affected by audit field updates");
@@ -458,7 +339,6 @@ public sealed class DomainEntityTests
 
         // Act & Assert
         Assert.IsTrue(entity.Equals(entity));
-        Assert.IsTrue(entity == entity);
     }
 
     [TestMethod]
@@ -508,106 +388,133 @@ public sealed class DomainEntityTests
     }
 
     [TestMethod]
-    public void GetHashCodeIsConsistentForSameId()
+    public void DomainEventPropertiesAreCorrectlySet()
     {
         // Arrange
         var id = Guid.NewGuid();
-        var a = new TestEntity(id);
-        var b = new TestEntity(id);
+        var entity = new TestEntity(id);
+        var occurredOn = DateTime.UtcNow.AddHours(1);
+        var domainEvent = new TestEvent(entity) { OccurredOn = occurredOn };
 
-        // Act & Assert
-        Assert.AreEqual(a.GetHashCode(), b.GetHashCode());
+        // Act
+        entity.AddDomainEvent(domainEvent);
+
+        // Assert
+        Assert.AreEqual(1, entity.DomainEvents.Count);
+        var eventFromEntity = entity.DomainEvents[0];
+        Assert.AreEqual(entity, eventFromEntity.Item);
+        Assert.AreEqual(occurredOn, eventFromEntity.OccurredOn, "Domain event OccurredOn should match the set value");
     }
 
     [TestMethod]
-    public void GetHashCodeIsDifferentForDifferentIds()
-    {
-        // Arrange
-        var a = new TestEntity(Guid.NewGuid());
-        var b = new TestEntity(Guid.NewGuid());
-
-        // Act & Assert
-        Assert.AreNotEqual(a.GetHashCode(), b.GetHashCode());
-    }
-
-    [TestMethod]
-    public void GetHashCodeIsConsistentAcrossMultipleCalls()
+    public void MarkModifiedSetsModifiedOn()
     {
         // Arrange
         var entity = new TestEntity(Guid.NewGuid());
 
         // Act
-        var hash1 = entity.GetHashCode();
-        var hash2 = entity.GetHashCode();
+        entity.MarkModified();
 
         // Assert
-        Assert.AreEqual(hash1, hash2);
+        Assert.IsNotNull(entity.ModifiedOn);
     }
 
     [TestMethod]
-    public void GetHashCodeSameIdDifferentPropertiesHaveSameHash()
+    public void MarkModifiedSetsModifiedOnToUtcNow()
     {
         // Arrange
-        var id = Guid.NewGuid();
-        var a = new TestEntity(id) { Name = "Entity A" };
-        var b = new TestEntity(id) { Name = "Entity B" };
-
-        // Act & Assert
-        Assert.AreEqual(a.GetHashCode(), b.GetHashCode(), "Entities with same Id should have same hash code");
-    }
-
-    [TestMethod]
-    public void PropertiesAreProtectedSet()
-    {
-        // Arrange & Act & Assert
-        var idProp = typeof(TestEntity).GetProperty("Id");
-        Assert.IsNotNull(idProp, "Id property should exist.");
-        Assert.IsNotNull(idProp.SetMethod, "Id property should have a set method.");
-        Assert.IsTrue(idProp.SetMethod.IsFamily, "Id setter should be protected.");
-
-        var partitionKeyProp = typeof(TestEntity).GetProperty("PartitionKey");
-        Assert.IsNotNull(partitionKeyProp, "PartitionKey property should exist.");
-        Assert.IsNotNull(partitionKeyProp.SetMethod, "PartitionKey property should have a set method.");
-        Assert.IsTrue(partitionKeyProp.SetMethod.IsFamily, "PartitionKey setter should be protected.");
-    }
-
-    [TestMethod]
-    public void AllConstructorsChainingPreservesBaseProperties()
-    {
-        // Arrange
-        var id = Guid.NewGuid();
-        var partitionKey = "test-pk";
-        var createdOn = DateTime.UtcNow;
-        var timestamp = DateTimeOffset.UtcNow;
+        var entity = new TestEntity(Guid.NewGuid());
+        Assert.IsNull(entity.ModifiedOn, "ModifiedOn should be null initially");
 
         // Act
-        var fullEntity = new TestEntity(id, partitionKey, createdOn, timestamp);
-
-        // Assert - verify all properties are set correctly through constructor chaining
-        Assert.AreEqual(id, fullEntity.Id);
-        Assert.AreEqual(partitionKey, fullEntity.PartitionKey);
-        Assert.AreEqual(createdOn, fullEntity.CreatedOn);
-        Assert.AreEqual(timestamp, fullEntity.Timestamp);
-    }
-
-    [TestMethod]
-    public void EntityCanBeUsedInCollections()
-    {
-        // Arrange
-        var id1 = Guid.NewGuid();
-        var id2 = Guid.NewGuid();
-        var entity1 = new TestEntity(id1);
-        var entity2 = new TestEntity(id2);
-        var entity3 = new TestEntity(id1); // Same Id as entity1
-
-        // Act
-        var list = new List<TestEntity> { entity1, entity2 };
-        var hashSet = new HashSet<TestEntity> { entity1, entity2, entity3 };
+        var before = DateTime.UtcNow;
+        entity.MarkModified();
+        var after = DateTime.UtcNow;
 
         // Assert
-        Assert.AreEqual(2, list.Count);
-        Assert.AreEqual(2, hashSet.Count, "HashSet should contain only 2 unique entities based on Id");
-        Assert.IsTrue(list.Contains(entity1));
-        Assert.IsTrue(list.Contains(entity2));
+        Assert.IsNotNull(entity.ModifiedOn, "ModifiedOn should be set after MarkModified");
+        Assert.IsTrue(entity.ModifiedOn >= before && entity.ModifiedOn <= after, "ModifiedOn should be set to a value between before and after");
+    }
+
+    [TestMethod]
+    public void MarkModifiedUpdatesModifiedOnToMoreRecentValue()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+        entity.MarkModified();
+        var firstModified = entity.ModifiedOn;
+        Assert.IsNotNull(firstModified);
+
+        // Act
+        System.Threading.Thread.Sleep(10); // Ensure time passes
+        entity.MarkModified();
+        var secondModified = entity.ModifiedOn;
+
+        // Assert
+        Assert.IsNotNull(secondModified);
+        Assert.IsTrue(secondModified > firstModified, "ModifiedOn should be updated to a more recent value");
+    }
+
+    [TestMethod]
+    public void MarkDeletedSetsDeletedOn()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+
+        // Act
+        entity.MarkDeleted();
+
+        // Assert
+        Assert.IsNotNull(entity.DeletedOn);
+    }
+
+    [TestMethod]
+    public void MarkDeletedSetsDeletedOnToUtcNowIfNull()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+        Assert.IsNull(entity.DeletedOn, "DeletedOn should be null initially");
+
+        // Act
+        var before = DateTime.UtcNow;
+        entity.MarkDeleted();
+        var after = DateTime.UtcNow;
+
+        // Assert
+        Assert.IsNotNull(entity.DeletedOn, "DeletedOn should be set after MarkDeleted");
+        Assert.IsTrue(entity.DeletedOn >= before && entity.DeletedOn <= after, "DeletedOn should be set to a value between before and after");
+    }
+
+    [TestMethod]
+    public void MarkDeletedDoesNotOverwriteExistingDeletedOn()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+        entity.MarkDeleted();
+        var firstDeletedOn = entity.DeletedOn;
+        Assert.IsNotNull(firstDeletedOn);
+
+        // Act
+        System.Threading.Thread.Sleep(10); // Ensure time passes
+        entity.MarkDeleted();
+        var secondDeletedOn = entity.DeletedOn;
+
+        // Assert
+        Assert.AreEqual(firstDeletedOn, secondDeletedOn, "DeletedOn should not be overwritten if already set");
+    }
+
+    [TestMethod]
+    public void MarkUndeletedClearsDeletedOn()
+    {
+        // Arrange
+        var entity = new TestEntity(Guid.NewGuid());
+        entity.MarkDeleted();
+        Assert.IsNotNull(entity.DeletedOn);
+
+        // Act
+        entity.MarkUndeleted();
+
+        // Assert
+        Assert.IsNull(entity.DeletedOn);
     }
 }

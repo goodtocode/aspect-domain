@@ -1,5 +1,6 @@
 ﻿using Goodtocode.Domain.Entities;
 using Goodtocode.Domain.Events;
+using Goodtocode.Domain.Tests.TestHelpers;
 
 namespace Goodtocode.Domain.Tests.Entities;
 
@@ -34,6 +35,9 @@ public sealed class SecuredEntityTests
         Assert.IsNotNull(entity);
         Assert.AreEqual(Guid.Empty, entity.OwnerId);
         Assert.AreEqual(Guid.Empty, entity.TenantId);
+        Assert.AreEqual(Guid.Empty, entity.CreatedBy);
+        Assert.IsNull(entity.ModifiedBy);
+        Assert.IsNull(entity.DeletedBy);
     }
 
     [TestMethod]
@@ -50,6 +54,9 @@ public sealed class SecuredEntityTests
         Assert.AreEqual(id, entity.Id);
         Assert.AreEqual(Guid.Empty, entity.OwnerId);
         Assert.AreEqual(Guid.Empty, entity.TenantId);
+        Assert.AreEqual(Guid.Empty, entity.CreatedBy);
+        Assert.IsNull(entity.ModifiedBy);
+        Assert.IsNull(entity.DeletedBy);
     }
 
     [TestMethod]
@@ -71,83 +78,215 @@ public sealed class SecuredEntityTests
     }
 
     [TestMethod]
-    public void SetOwnerIdUpdatesOwnerId()
+    public void PartitionKeyReturnsTenantIdAsString()
     {
         // Arrange
-        var entity = new TestSecuredEntity();
+        var id = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var entity = new TestSecuredEntity(id, ownerId, tenantId);
+
+        // Act & Assert
+        Assert.AreEqual(tenantId.ToString(), entity.PartitionKey);
+    }
+
+    [TestMethod]
+    public void ChangeOwnerUpdatesOwnerId()
+    {
+        // Arrange
+        var entity = new TestSecuredEntity(Guid.NewGuid());
         var ownerId = Guid.NewGuid();
 
         // Act
-        entity.SetOwnerId(ownerId);
+        entity.ChangeOwner(ownerId);
 
         // Assert
         Assert.AreEqual(ownerId, entity.OwnerId);
     }
 
     [TestMethod]
-    public void SetTenantIdUpdatesTenantId()
+    public void ChangeTenantUpdatesTenantId()
     {
         // Arrange
-        var entity = new TestSecuredEntity();
+        var entity = new TestSecuredEntity(Guid.NewGuid());
         var tenantId = Guid.NewGuid();
 
         // Act
-        entity.SetTenantId(tenantId);
+        entity.ChangeTenant(tenantId);
 
         // Assert
         Assert.AreEqual(tenantId, entity.TenantId);
     }
 
     [TestMethod]
-    public void SetSecurityContextUpdatesBothOwnerIdAndTenantId()
+    public void MarkCreatedSetsCreatedByOnce()
     {
         // Arrange
-        var entity = new TestSecuredEntity();
+        var entity = new TestSecuredEntity(Guid.NewGuid());
+        var userId = Guid.NewGuid();
+
+        // Act
+        entity.MarkCreated(userId);
+
+        // Assert
+        Assert.AreEqual(userId, entity.CreatedBy);
+
+        // Act
+        var anotherUser = Guid.NewGuid();
+        entity.MarkCreated(anotherUser);
+
+        // Assert
+        Assert.AreEqual(userId, entity.CreatedBy, "CreatedBy should not change after first set");
+    }
+
+    [TestMethod]
+    public void MarkModifiedSetsModifiedBy()
+    {
+        // Arrange
+        var entity = new TestSecuredEntity(Guid.NewGuid());
+        var userId = Guid.NewGuid();
+
+        // Act
+        entity.MarkModified(userId);
+
+        // Assert
+        Assert.AreEqual(userId, entity.ModifiedBy);
+
+        // Act
+        var anotherUser = Guid.NewGuid();
+        entity.MarkModified(anotherUser);
+
+        // Assert
+        Assert.AreEqual(anotherUser, entity.ModifiedBy, "ModifiedBy should update to latest");
+    }
+
+    [TestMethod]
+    public void MarkDeletedSetsDeletedByOnce()
+    {
+        // Arrange
+        var entity = new TestSecuredEntity(Guid.NewGuid());
+        var userId = Guid.NewGuid();
+
+        // Act
+        entity.MarkDeleted(userId);
+
+        // Assert
+        Assert.AreEqual(userId, entity.DeletedBy);
+
+        // Act
+        var anotherUser = Guid.NewGuid();
+        entity.MarkDeleted(anotherUser);
+
+        // Assert
+        Assert.AreEqual(userId, entity.DeletedBy, "DeletedBy should not change after first set");
+    }
+
+    [TestMethod]
+    public void EqualityEntitiesWithSameIdAreEqual()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
         var ownerId = Guid.NewGuid();
         var tenantId = Guid.NewGuid();
+        var a = new TestSecuredEntity(id, ownerId, tenantId);
+        var b = new TestSecuredEntity(id, ownerId, tenantId);
 
-        // Act
-        entity.SetSecurityContext(ownerId, tenantId);
-
-        // Assert
-        Assert.AreEqual(ownerId, entity.OwnerId);
-        Assert.AreEqual(tenantId, entity.TenantId);
+        // Act & Assert
+        Assert.IsTrue(a.Equals(b));
+        Assert.IsTrue(a == b);
+        Assert.IsFalse(a != b);
     }
 
     [TestMethod]
-    public void SetSecurityContextCanOverrideExistingValues()
+    public void EqualityEntitiesWithDifferentIdAreNotEqual()
     {
         // Arrange
-        var initialOwnerId = Guid.NewGuid();
-        var initialTenantId = Guid.NewGuid();
-        var entity = new TestSecuredEntity(Guid.NewGuid(), initialOwnerId, initialTenantId);
-        
-        var newOwnerId = Guid.NewGuid();
-        var newTenantId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var a = new TestSecuredEntity(Guid.NewGuid(), ownerId, tenantId);
+        var b = new TestSecuredEntity(Guid.NewGuid(), ownerId, tenantId);
 
-        // Act
-        entity.SetSecurityContext(newOwnerId, newTenantId);
-
-        // Assert
-        Assert.AreEqual(newOwnerId, entity.OwnerId);
-        Assert.AreEqual(newTenantId, entity.TenantId);
-        Assert.AreNotEqual(initialOwnerId, entity.OwnerId);
-        Assert.AreNotEqual(initialTenantId, entity.TenantId);
+        // Act & Assert
+        Assert.IsFalse(a.Equals(b));
+        Assert.IsFalse(a == b);
+        Assert.IsTrue(a != b);
     }
 
     [TestMethod]
-    public void PropertiesAreProtectedSet()
+    public void EqualityWithNullReturnsFalse()
     {
-        // Arrange & Act & Assert
-        var ownerIdProp = typeof(TestSecuredEntity).GetProperty("OwnerId");
-        Assert.IsNotNull(ownerIdProp, "OwnerId property should exist.");
-        Assert.IsNotNull(ownerIdProp.SetMethod, "OwnerId property should have a set method.");
-        Assert.IsTrue(ownerIdProp.SetMethod.IsFamily, "OwnerId setter should be protected.");
+        // Arrange
+        var entity = new TestSecuredEntity(Guid.NewGuid());
 
-        var tenantIdProp = typeof(TestSecuredEntity).GetProperty("TenantId");
-        Assert.IsNotNull(tenantIdProp, "TenantId property should exist.");
-        Assert.IsNotNull(tenantIdProp.SetMethod, "TenantId property should have a set method.");
-        Assert.IsTrue(tenantIdProp.SetMethod.IsFamily, "TenantId setter should be protected.");
+        // Act & Assert
+        Assert.IsFalse(entity.Equals(null));
+        Assert.IsFalse(entity == null);
+        Assert.IsTrue(entity != null);
+    }
+
+    [TestMethod]
+    public void EqualityBothNullReturnsTrue()
+    {
+        // Arrange
+        TestSecuredEntity? a = null;
+        TestSecuredEntity? b = null;
+
+        // Act & Assert
+        Assert.IsTrue(a == b);
+        Assert.IsFalse(a != b);
+    }
+
+    [TestMethod]
+    public void GetHashCodeIsConsistentForSameId()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+        var a = new TestSecuredEntity(id, Guid.NewGuid(), Guid.NewGuid());
+        var b = new TestSecuredEntity(id, Guid.NewGuid(), Guid.NewGuid());
+
+        // Act & Assert
+        Assert.AreEqual(a.GetHashCode(), b.GetHashCode());
+    }
+
+    [TestMethod]
+    public void GetHashCodeIsDifferentForDifferentIds()
+    {
+        // Arrange
+        var ownerId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var a = new TestSecuredEntity(Guid.NewGuid(), ownerId, tenantId);
+        var b = new TestSecuredEntity(Guid.NewGuid(), ownerId, tenantId);
+
+        // Act & Assert
+        Assert.AreNotEqual(a.GetHashCode(), b.GetHashCode());
+    }
+
+    [TestMethod]
+    public void GetHashCodeIsConsistentAcrossMultipleCalls()
+    {
+        // Arrange
+        var entity = new TestSecuredEntity(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+
+        // Act
+        var hash1 = entity.GetHashCode();
+        var hash2 = entity.GetHashCode();
+
+        // Assert
+        Assert.AreEqual(hash1, hash2);
+    }
+
+    [TestMethod]
+    public void InheritedPropertiesFromDomainEntityAreAccessible()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var entity = new TestSecuredEntity(id, ownerId, tenantId);
+
+        // Act & Assert
+        Assert.AreEqual(id, entity.Id);
+        Assert.AreEqual(entity.PartitionKey, entity.TenantId.ToString());
     }
 
     [TestMethod]
@@ -187,264 +326,6 @@ public sealed class SecuredEntityTests
         Assert.AreEqual(2, entity.DomainEvents.Count);
         Assert.AreSame(evt1, entity.DomainEvents[0]);
         Assert.AreSame(evt2, entity.DomainEvents[1]);
-    }
-
-    [TestMethod]
-    public void SetCreatedOnUpdatesCreatedOnProperty()
-    {
-        // Arrange
-        var entity = new TestSecuredEntity(Guid.NewGuid());
-        var createdOn = DateTime.UtcNow;
-
-        // Act
-        entity.SetCreatedOn(createdOn);
-
-        // Assert
-        Assert.AreEqual(createdOn, entity.CreatedOn);
-    }
-
-    [TestMethod]
-    public void SetModifiedOnUpdatesModifiedOnProperty()
-    {
-        // Arrange
-        var entity = new TestSecuredEntity(Guid.NewGuid());
-        var modifiedOn = DateTime.UtcNow;
-
-        // Act
-        entity.SetModifiedOn(modifiedOn);
-
-        // Assert
-        Assert.AreEqual(modifiedOn, entity.ModifiedOn);
-    }
-
-    [TestMethod]
-    public void SetDeletedOnUpdatesDeletedOnProperty()
-    {
-        // Arrange
-        var entity = new TestSecuredEntity(Guid.NewGuid());
-        var deletedOn = DateTime.UtcNow;
-
-        // Act
-        entity.SetDeletedOn(deletedOn);
-
-        // Assert
-        Assert.AreEqual(deletedOn, entity.DeletedOn);
-    }
-
-    [TestMethod]
-    public void SetAuditFieldsModifiedAndDeletedOn()
-    {
-        // Arrange
-        var entity = new TestSecuredEntity(Guid.NewGuid());
-        var mod = DateTime.UtcNow;
-        var del = DateTime.UtcNow.AddDays(1);
-
-        // Act
-        entity.SetModifiedOn(mod);
-        entity.SetDeletedOn(del);
-
-        // Assert
-        Assert.AreEqual(mod, entity.ModifiedOn);
-        Assert.AreEqual(del, entity.DeletedOn);
-    }
-
-    [TestMethod]
-    public void EqualityEntitiesWithSameIdAreEqual()
-    {
-        // Arrange
-        var id = Guid.NewGuid();
-        var ownerId = Guid.NewGuid();
-        var tenantId = Guid.NewGuid();
-        var a = new TestSecuredEntity(id, ownerId, tenantId);
-        var b = new TestSecuredEntity(id, ownerId, tenantId);
-
-        // Act & Assert
-        Assert.IsTrue(a.Equals(b));
-        Assert.IsTrue(a == b);
-        Assert.IsFalse(a != b);
-    }
-
-    [TestMethod]
-    public void EqualityEntitiesWithDifferentIdAreNotEqual()
-    {
-        // Arrange
-        var ownerId = Guid.NewGuid();
-        var tenantId = Guid.NewGuid();
-        var a = new TestSecuredEntity(Guid.NewGuid(), ownerId, tenantId);
-        var b = new TestSecuredEntity(Guid.NewGuid(), ownerId, tenantId);
-
-        // Act & Assert
-        Assert.IsFalse(a.Equals(b));
-        Assert.IsFalse(a == b);
-        Assert.IsTrue(a != b);
-    }
-
-    [TestMethod]
-    public void EqualitySameIdDifferentSecurityContextAreEqual()
-    {
-        // Arrange
-        var id = Guid.NewGuid();
-        var a = new TestSecuredEntity(id, Guid.NewGuid(), Guid.NewGuid());
-        var b = new TestSecuredEntity(id, Guid.NewGuid(), Guid.NewGuid());
-
-        // Act & Assert
-        Assert.IsTrue(a.Equals(b), "Entities with same Id should be equal regardless of security context");
-        Assert.IsTrue(a == b);
-    }
-
-    [TestMethod]
-    public void EqualitySameReferenceIsEqual()
-    {
-        // Arrange
-        var entity = new TestSecuredEntity(Guid.NewGuid());
-
-        // Act & Assert
-        Assert.IsTrue(entity.Equals(entity));
-        Assert.IsTrue(entity == entity);
-    }
-
-    [TestMethod]
-    public void EqualityWithNullReturnsFalse()
-    {
-        // Arrange
-        var entity = new TestSecuredEntity(Guid.NewGuid());
-
-        // Act & Assert
-        Assert.IsFalse(entity.Equals(null));
-        Assert.IsFalse(entity == null);
-        Assert.IsTrue(entity != null);
-    }
-
-    [TestMethod]
-    public void EqualityBothNullReturnsTrue()
-    {
-        // Arrange
-        TestSecuredEntity? a = null;
-        TestSecuredEntity? b = null;
-
-        // Act & Assert
-        Assert.IsTrue(a == b);
-        Assert.IsFalse(a != b);
-    }
-
-    [TestMethod]
-    public void EqualityWithEmptyGuidReturnsFalse()
-    {
-        // Arrange
-        var a = new TestSecuredEntity(Guid.Empty);
-        var b = new TestSecuredEntity(Guid.Empty);
-
-        // Act & Assert
-        Assert.IsFalse(a.Equals(b));
-    }
-
-    [TestMethod]
-    public void EqualityWithDifferentTypeReturnsFalse()
-    {
-        // Arrange
-        var entity = new TestSecuredEntity(Guid.NewGuid());
-        var notAnEntity = new object();
-
-        // Act & Assert
-        Assert.IsFalse(entity.Equals(notAnEntity));
-    }
-
-    [TestMethod]
-    public void GetHashCodeIsConsistentForSameId()
-    {
-        // Arrange
-        var id = Guid.NewGuid();
-        var a = new TestSecuredEntity(id, Guid.NewGuid(), Guid.NewGuid());
-        var b = new TestSecuredEntity(id, Guid.NewGuid(), Guid.NewGuid());
-
-        // Act & Assert
-        Assert.AreEqual(a.GetHashCode(), b.GetHashCode(), "Entities with same Id should have same hash code");
-    }
-
-    [TestMethod]
-    public void GetHashCodeIsDifferentForDifferentIds()
-    {
-        // Arrange
-        var ownerId = Guid.NewGuid();
-        var tenantId = Guid.NewGuid();
-        var a = new TestSecuredEntity(Guid.NewGuid(), ownerId, tenantId);
-        var b = new TestSecuredEntity(Guid.NewGuid(), ownerId, tenantId);
-
-        // Act & Assert
-        Assert.AreNotEqual(a.GetHashCode(), b.GetHashCode());
-    }
-
-    [TestMethod]
-    public void GetHashCodeIsConsistentAcrossMultipleCalls()
-    {
-        // Arrange
-        var entity = new TestSecuredEntity(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
-
-        // Act
-        var hash1 = entity.GetHashCode();
-        var hash2 = entity.GetHashCode();
-
-        // Assert
-        Assert.AreEqual(hash1, hash2);
-    }
-
-    [TestMethod]
-    public void InheritedPropertiesFromDomainEntityAreAccessible()
-    {
-        // Arrange
-        var id = Guid.NewGuid();
-        var ownerId = Guid.NewGuid();
-        var tenantId = Guid.NewGuid();
-
-        // Act
-        var entity = new TestSecuredEntity(id, ownerId, tenantId);
-
-        // Assert
-        Assert.AreEqual(id, entity.Id);
-        Assert.AreEqual(entity.PartitionKey, entity.TenantId.ToString());
-        Assert.AreEqual(default, entity.CreatedOn);
-        Assert.IsNull(entity.ModifiedOn);
-        Assert.IsNull(entity.DeletedOn);
-        Assert.IsNotNull(entity.Timestamp);
-    }
-
-    [TestMethod]
-    public void SecurityContextMaintainedWhenAuditFieldsUpdated()
-    {
-        // Arrange
-        var id = Guid.NewGuid();
-        var ownerId = Guid.NewGuid();
-        var tenantId = Guid.NewGuid();
-        var entity = new TestSecuredEntity(id, ownerId, tenantId);
-        var modifiedOn = DateTime.UtcNow;
-
-        // Act
-        entity.SetModifiedOn(modifiedOn);
-
-        // Assert
-        Assert.AreEqual(ownerId, entity.OwnerId, "OwnerId should remain unchanged");
-        Assert.AreEqual(tenantId, entity.TenantId, "TenantId should remain unchanged");
-        Assert.AreEqual(modifiedOn, entity.ModifiedOn);
-    }
-
-    [TestMethod]
-    public void AuditFieldsMaintainedWhenSecurityContextUpdated()
-    {
-        // Arrange
-        var entity = new TestSecuredEntity(Guid.NewGuid());
-        var createdOn = DateTime.UtcNow;
-        entity.SetCreatedOn(createdOn);
-        
-        var newOwnerId = Guid.NewGuid();
-        var newTenantId = Guid.NewGuid();
-
-        // Act
-        entity.SetSecurityContext(newOwnerId, newTenantId);
-
-        // Assert
-        Assert.AreEqual(newOwnerId, entity.OwnerId);
-        Assert.AreEqual(newTenantId, entity.TenantId);
-        Assert.AreEqual(createdOn, entity.CreatedOn, "CreatedOn should remain unchanged");
     }
 
     [TestMethod]

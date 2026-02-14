@@ -6,7 +6,7 @@ namespace Goodtocode.Domain.Tests.Entities;
 [TestClass]
 public sealed class SecuredEntityExtensionsTests
 {
-    private class TestSecuredEntity : ISecuredEntity<TestSecuredEntity>
+    private sealed class TestSecuredEntity : ISecurable
     {
         public Guid OwnerId { get; set; }
         public Guid TenantId { get; set; }
@@ -32,20 +32,48 @@ public sealed class SecuredEntityExtensionsTests
             // No-op for test stub
         }
 
-        public void SetOwnerId(Guid value)
+        public void ChangeOwner(Guid value)
         {
             OwnerId = value;
         }
 
-        public void SetTenantId(Guid value)
+        public void ChangeTenant(Guid value)
         {
             TenantId = value;
         }
 
-        public void SetSecurityContext(Guid ownerId, Guid tenantId)
+        public void MarkModified()
         {
-            OwnerId = ownerId;
-            TenantId = tenantId;
+            ModifiedOn = DateTime.UtcNow;
+        }
+
+        public void MarkDeleted()
+        {
+            DeletedOn = DateTime.UtcNow;
+        }
+
+        public void MarkUndeleted()
+        {
+            DeletedOn = null;
+            DeletedBy = null;
+        }
+
+        public void MarkCreated(Guid ownerId)
+        {
+            CreatedOn = DateTime.UtcNow;
+            CreatedBy = ownerId;
+        }
+
+        public void MarkModified(Guid ownerId)
+        {
+            ModifiedOn = DateTime.UtcNow;
+            ModifiedBy = ownerId;
+        }
+
+        public void MarkDeleted(Guid ownerId)
+        {
+            DeletedOn = DateTime.UtcNow;
+            DeletedBy = ownerId;
         }
     }
 

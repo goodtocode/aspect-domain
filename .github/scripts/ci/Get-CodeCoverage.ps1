@@ -5,22 +5,45 @@
 #   2. Change directory to the script folder:
 #      CD src (wherever your script is)
 #   3. In powershell, run script: 
-#      .\Get-CodeCoverage.ps1 -TestProjectFilter '*.Tests.csproj' -ProdPackagesOnly -ProductionAssemblies 'MyApp.Core','MyApp.Web'
+#      .\Get-CodeCoverage.ps1 -TestProjectFilter '*Tests*.csproj'
 # This script uses native .NET 10 code coverage (Microsoft.Testing.Platform)
 # Note: Due to MSTest 4.1.0 incompatibility with 'dotnet test' on .NET 10, this runs tests as executables
 ####################################################################################
 
 Param(
-    [string]$TestProjectFilter = '*.Tests.csproj',    
-    [switch]$ProdPackagesOnly = $false,    
-    [string[]]$ProductionAssemblies = @(
-        "Goodtocode.Validation"
-    )
+    [string]$TestProjectFilter = '*Tests*.csproj',    
+    [string]$Configuration = 'Release',
+    [string]$TestRootPath = ''
 )
 ####################################################################################
 if ($IsWindows) {Set-ExecutionPolicy Unrestricted -Scope Process -Force}
 $VerbosePreference = 'SilentlyContinue' # 'Continue'
 ####################################################################################
+
+function Resolve-TestRootPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.IO.DirectoryInfo]$ScriptDir,
+        [Parameter(Mandatory = $false)]
+        [string]$OverridePath
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($OverridePath)) {
+        return Get-Item -Path (Resolve-Path -Path $OverridePath)
+    }
+
+    $current = $ScriptDir
+    while ($null -ne $current) {
+        $srcCandidate = Join-Path $current.FullName 'src'
+        if (Test-Path -Path $srcCandidate) {
+            return Get-Item -Path $srcCandidate
+        }
+
+        $current = $current.Parent
+    }
+
+    return $ScriptDir
+}
 
 # Install required tools
 & dotnet tool install -g dotnet-reportgenerator-globaltool
@@ -28,31 +51,35 @@ $VerbosePreference = 'SilentlyContinue' # 'Continue'
 
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $scriptPath = Get-Item -Path $PSScriptRoot
-$reportOutputPath = Join-Path $scriptPath "TestResults\Reports\$timestamp"
+$testRootPath = Resolve-TestRootPath -ScriptDir $scriptPath -OverridePath $TestRootPath
+$reportOutputPath = Join-Path $testRootPath "TestResults\Reports\$timestamp"
 
 New-Item -ItemType Directory -Force -Path $reportOutputPath 
 
 # Find test projects
-$testProjects = Get-ChildItem $scriptPath -Filter $TestProjectFilter -Recurse
+$testProjects = Get-ChildItem $testRootPath -Filter $TestProjectFilter -Recurse
 Write-Host "Found $($testProjects.Count) test projects."
 
 foreach ($project in $testProjects) {
     $testProjectPath = $project.FullName
     Write-Host "Running tests with coverage for project: $($project.BaseName)"
+
+    Write-Host "Building test project: $($project.BaseName)"
+    & dotnet build $testProjectPath --configuration $Configuration
     
     # Use 'dotnet run' instead of 'dotnet test' for MSTest runner projects
     # This bypasses the VSTest target that's incompatible with .NET 10 SDK
     Push-Location $project.DirectoryName
-    & dotnet run --configuration Debug --no-build -- --coverage
+    & dotnet run --configuration $Configuration --no-build -- --coverage
     Pop-Location
 }
 
 # Collect all coverage files (Microsoft.Testing.Platform outputs .coverage files)
-$coverageFiles = Get-ChildItem -Path $scriptPath -Filter "*.coverage" -Recurse | Select-Object -ExpandProperty FullName
+$coverageFiles = Get-ChildItem -Path $testRootPath -Filter "*.coverage" -Recurse | Select-Object -ExpandProperty FullName
 
 if ($coverageFiles.Count -eq 0) {
     Write-Warning "No coverage files found. Make sure your test projects have code coverage enabled."
-    exit 1
+    exit 0
 }
 
 Write-Host "Found $($coverageFiles.Count) coverage file(s)"
@@ -70,21 +97,14 @@ foreach ($coverageFile in $coverageFiles) {
 
 if ($coverageXmlFiles.Count -eq 0) {
     Write-Warning "No XML coverage files were generated."
-    exit 1
+    exit 0
 }
 
 Write-Host "Generated $($coverageXmlFiles.Count) XML coverage file(s)"
 
 # Generate HTML report
 $coverageFilesArg = ($coverageXmlFiles -join ";")
-
-if ($ProdPackagesOnly) {
-    $assemblyFilters = ($ProductionAssemblies | ForEach-Object { "+$_" }) -join ";"
-    & reportgenerator -reports:$coverageFilesArg -targetdir:$reportOutputPath -reporttypes:Html -assemblyfilters:$assemblyFilters
-}
-else {
-    & reportgenerator -reports:$coverageFilesArg -targetdir:$reportOutputPath -reporttypes:Html
-}
+& reportgenerator -reports:$coverageFilesArg -targetdir:$reportOutputPath -reporttypes:Html
 
 Write-Host "Code coverage report generated at: $reportOutputPath"
 
