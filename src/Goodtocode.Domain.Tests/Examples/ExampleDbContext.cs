@@ -8,15 +8,9 @@ namespace Goodtocode.Domain.Tests.Examples
     /// Example DbContext showing how to integrate IAuditable and ISecurable with EF Core.
     /// Copy/adapt this pattern in your infrastructure layer.
     /// </summary>
-    public class ExampleDbContext : DbContext
+    public class ExampleDbContext(DbContextOptions options, ICurrentUserContext currentUserContext) : DbContext(options)
     {
-        private readonly ICurrentUserContext _currentUserContext;
-
-        public ExampleDbContext(DbContextOptions options, ICurrentUserContext currentUserContext)
-            : base(options)
-        {
-            _currentUserContext = currentUserContext;
-        }
+        private readonly ICurrentUserContext _currentUserContext = currentUserContext;
 
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
@@ -27,17 +21,18 @@ namespace Goodtocode.Domain.Tests.Examples
 
         private void SetAuditFields()
         {
+            var now = DateTime.UtcNow; // For deterministic/idempotent audit
             foreach (var entry in ChangeTracker.Entries())
             {
                 if (entry.Entity is IAuditable auditable)
                 {
                     if (entry.State == EntityState.Modified)
                     {
-                        auditable.MarkModified();
+                        auditable.MarkModified(now);
                     }
                     else if (entry.State == EntityState.Deleted)
                     {
-                        auditable.MarkDeleted();
+                        auditable.MarkDeleted(now);
                         entry.State = EntityState.Modified;
                     }
                 }
