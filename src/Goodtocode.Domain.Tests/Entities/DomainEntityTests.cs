@@ -13,8 +13,12 @@ public sealed class DomainEntityTests
         public TestEntity() { }
         public TestEntity(Guid id) : base(id) { }
         public TestEntity(Guid id, string partitionKey) : base(id, partitionKey) { }
+        public TestEntity(Guid id, string partitionKey, string rowKey, DateTime createdOn, DateTimeOffset timestamp)
+            : base(id, partitionKey, rowKey, createdOn, timestamp) { }
+        public TestEntity(Guid id, string partitionKey, string rowKey)
+            : base(id, partitionKey, rowKey) { }
         public TestEntity(Guid id, string partitionKey, DateTime createdOn, DateTimeOffset timestamp)
-            : base(id, partitionKey, createdOn, timestamp) { }
+            : base(id, partitionKey, id.ToString(), createdOn, timestamp) { }
     }
 
     private sealed class TestEvent(DomainEntityTests.TestEntity item) : IDomainEvent<TestEntity>
@@ -33,6 +37,7 @@ public sealed class DomainEntityTests
         Assert.IsNotNull(entity);
         Assert.AreNotEqual(Guid.Empty, entity.Id);
         Assert.AreEqual(entity.Id.ToString(), entity.PartitionKey);
+        Assert.AreEqual(entity.Id.ToString(), entity.RowKey);
         Assert.AreNotEqual(default, entity.CreatedOn);
         Assert.IsNull(entity.ModifiedOn);
         Assert.IsNull(entity.DeletedOn);
@@ -51,6 +56,7 @@ public sealed class DomainEntityTests
         Assert.IsNotNull(entity);
         Assert.AreEqual(id, entity.Id);
         Assert.AreEqual(id.ToString(), entity.PartitionKey);
+        Assert.AreEqual(id.ToString(), entity.RowKey);
     }
 
     [TestMethod]
@@ -67,6 +73,7 @@ public sealed class DomainEntityTests
         Assert.IsNotNull(entity);
         Assert.AreEqual(id, entity.Id);
         Assert.AreEqual(partitionKey, entity.PartitionKey);
+        Assert.AreEqual(id.ToString(), entity.RowKey);
     }
 
     [TestMethod]
@@ -83,6 +90,7 @@ public sealed class DomainEntityTests
         Assert.AreEqual(partitionKey, entity.PartitionKey);
         Assert.AreEqual(id, entity.Id);
         Assert.AreEqual(string.Empty, entity.Name);
+        Assert.AreEqual(id.ToString(), entity.RowKey);
     }
 
     [TestMethod]
@@ -97,6 +105,7 @@ public sealed class DomainEntityTests
         Assert.AreEqual("pk", entity.PartitionKey);
         Assert.AreEqual(now, entity.CreatedOn);
         Assert.AreEqual(ts, entity.Timestamp);
+        Assert.AreEqual(entity.Id.ToString(), entity.RowKey);
         Assert.IsNull(entity.ModifiedOn);
         Assert.IsNull(entity.DeletedOn);
     }
@@ -118,6 +127,7 @@ public sealed class DomainEntityTests
         Assert.AreEqual(partitionKey, entity.PartitionKey);
         Assert.AreEqual(createdOn, entity.CreatedOn);
         Assert.AreEqual(timestamp, entity.Timestamp);
+        Assert.AreEqual(id.ToString(), entity.RowKey);
         Assert.IsNull(entity.ModifiedOn);
         Assert.IsNull(entity.DeletedOn);
     }
@@ -513,5 +523,22 @@ public sealed class DomainEntityTests
 
         // Assert
         Assert.IsNull(entity.DeletedOn);
+    }
+
+    [TestMethod]
+    public void ConstructorWithIdPartitionKeyAndRowKeySetsRowKey()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+        var partitionKey = "test-partition";
+        var rowKey = "custom-row-key";
+
+        // Act
+        var entity = new TestEntity(id, partitionKey, rowKey);
+
+        // Assert
+        Assert.AreEqual(id, entity.Id);
+        Assert.AreEqual(partitionKey, entity.PartitionKey);
+        Assert.AreEqual(rowKey, entity.RowKey);
     }
 }

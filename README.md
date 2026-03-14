@@ -4,7 +4,7 @@ Domain-Driven Design (DDD) base library for .NET Standard 2.1 and modern .NET pr
 
 [![NuGet CI/CD](https://github.com/goodtocode/aspect-domain/actions/workflows/gtc-domain-nuget.yml/badge.svg)](https://github.com/goodtocode/aspect-domain/actions/workflows/gtc-domain-nuget.yml)
 
-Goodtocode.Domain provides foundational types for building DDD, clean architecture, and event-driven systems. It includes base classes for domain entities, audit fields, domain events, and secured/multi-tenant entities. The library is lightweight, dependency-free, and designed to work with EF Core, Cosmos DB, or custom repositories.
+Goodtocode.Domain provides foundational types for building DDD, clean architecture, and event-driven systems. It includes base classes for domain entities, audit fields, domain events, and secured/multi-tenant entities. The library is lightweight, dependency-free, and designed to work with EF Core, Cosmos DB, Table Storage, or custom repositories.
 
 ## Target Frameworks
 - Library: `netstandard2.1`
@@ -14,7 +14,7 @@ Goodtocode.Domain provides foundational types for building DDD, clean architectu
 - Domain entity base with audit fields (`CreatedOn`, `ModifiedOn`, `DeletedOn`, `Timestamp`)
 - Domain event pattern and dispatcher (`IDomainEvent`, `IDomainHandler`, `DomainDispatcher`)
 - Equality and identity management for aggregate roots
-- Partition key support for document stores (`PartitionKey` defaults to `Id.ToString()`; for secured entities, defaults to `TenantId.ToString()`)
+- Partition key and row key support for document/table stores (`PartitionKey` and `RowKey` both default to `Id.ToString()` unless specified)
 - Secured entity base for multi-tenancy and ownership (`OwnerId`, `TenantId`, `CreatedBy`, `ModifiedBy`, `DeletedBy`)
 - Extension methods for authorization and ownership queries
 - **Invariant state protection** for audit and security fields (fields are only set if not already set, ensuring consistency and preventing accidental overwrites)
@@ -41,7 +41,8 @@ dotnet add package Goodtocode.Domain
    ```
 
 ## Core Concepts
-- `DomainEntity<TModel>`: Base entity with audit fields (`CreatedOn`, `ModifiedOn`, `DeletedOn`, `Timestamp`), identity (`Id`), partition key, and domain event tracking.
+- `DomainEntity<TModel>`: Base entity with audit fields (`CreatedOn`, `ModifiedOn`, `DeletedOn`, `Timestamp`), identity (`Id`), partition key, row key, and domain event tracking.
+- `PartitionKey` and `RowKey` both default to `Id.ToString()` unless explicitly set. This supports portability across Cosmos DB, Table Storage, and other stores. If you do not specify a value, both will be the same by default.
 - `SecuredEntity<TModel>`: Extends `DomainEntity<TModel>` with `OwnerId`, `TenantId`, and audit fields for user actions (`CreatedBy`, `ModifiedBy`, `DeletedBy`). `PartitionKey` defaults to `TenantId.ToString()` for multi-tenant isolation.
 - **Invariant state protection**: Methods like `MarkCreated`, `MarkDeleted`, etc. only set fields if not already set, ensuring entity state is consistent and protected from accidental changes.
 - Domain events: Implement `IDomainEvent<TModel>` and dispatch with `DomainDispatcher`.
@@ -67,6 +68,14 @@ public sealed class MyEntity : DomainEntity<MyEntity>
 }
 ```
 
+// Example: Customizing PartitionKey and RowKey
+```csharp
+public sealed class TableEntity : DomainEntity<TableEntity>
+{
+    public TableEntity(Guid id, string partitionKey, string rowKey) : base(id, partitionKey, rowKey) { }
+}
+```
+
 ### 2. Secured Entity with Multi-Tenant Ownership
 ```csharp
 using Goodtocode.Domain.Entities;
@@ -89,7 +98,6 @@ var tenantDocuments = queryableDocuments.WhereTenant(tenantId);
 var authorized = queryableDocuments.WhereAuthorized(tenantId, ownerId);
 ```
 
-person.ClearDomainEvents();
 ### 3. Domain Events + Dispatcher
 ```csharp
 using Goodtocode.Domain.Entities;
@@ -212,7 +220,7 @@ public class ExampleDbContext : DbContext
 
 ## Complete Examples
 See the fully working examples in the test project:
-- `Goodtocode.Domain.Tests/Examples/RowLevelSecurityExample.cs` (row-level security, audit fields, and partition key usage)
+- `Goodtocode.Domain.Tests/Examples/RowLevelSecurityExample.cs` (row-level security, audit fields, and partition/row key usage)
 - `Goodtocode.Domain.Tests/Examples/CommandHandlerWithEventsExample.cs` (command handlers, domain events, dispatcher, and service bus integration)
 - `Goodtocode.Domain.Tests/Examples/ExampleDbContext.cs` (**EF Core integration for audit and security fields**)
 
@@ -225,6 +233,7 @@ See the fully working examples in the test project:
 | Version | Date        | Release Notes     |
 |---------|-------------|-------------------|
 | 1.0.0   | 2026-Jan-19 | Initial release   |
+| 1.2.0   | 2026-Mar-14 | Added rowKey support |
 
 ## License
 
