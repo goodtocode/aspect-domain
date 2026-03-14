@@ -4,8 +4,8 @@ using System.Runtime.Serialization;
 namespace Goodtocode.Domain.Entities;
 
 /// <summary>
-/// Base class for domain entities, providing audit fields, domain events, and identity management.
-/// Suitable for DDD and clean architecture implementations with support for EF/SQL, EF/CosmosDb, or custom repositories.
+/// Base class for domain entities, providing audit fields, domain events, identity management, and storage keys.
+/// Suitable for DDD and clean architecture implementations with support for EF/SQL, EF/CosmosDb, Table Storage, or custom repositories.
 /// </summary>
 /// <typeparam name="TModel">The type of the domain model.</typeparam>
 public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
@@ -18,9 +18,14 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     public Guid Id { get; private set; } = Guid.NewGuid();
 
     /// <summary>
-    /// Gets the partition key for the entity, used for CosmosDb or similar stores.
+    /// Gets the partition key for the entity, used for CosmosDb, Table Storage, or similar stores.
     /// </summary>
     public string PartitionKey { get; private set; }
+
+    /// <summary>
+    /// Gets the row key for the entity, used for Table Storage or similar stores.
+    /// </summary>
+    public string RowKey { get; private set; }
 
     /// <summary>
     /// Gets the creation date and time of the entity.
@@ -54,6 +59,7 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     protected DomainEntity()
     {
         PartitionKey = Id.ToString();
+        RowKey = Id.ToString();
     }
 
     /// <summary>
@@ -65,28 +71,32 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     {
         Id = id;
         PartitionKey = id.ToString();
+        RowKey = id.ToString();
     }
 
     /// <summary>
-    /// Initializes a new instance with the specified identifier and partition key.
+    /// Initializes a new instance with the specified identifier, partition key, and optional row key.
     /// </summary>
     /// <param name="id">The unique identifier for the entity.</param>
     /// <param name="partitionKey">The partition key for the entity.</param>
-    protected DomainEntity(Guid id, string partitionKey)
+    /// <param name="rowKey">The row key for the entity (optional, defaults to id string).</param>
+    protected DomainEntity(Guid id, string partitionKey, string? rowKey = null)
         : this(id)
     {
         PartitionKey = partitionKey;
+        RowKey = rowKey ?? id.ToString();
     }
 
     /// <summary>
-    /// Initializes a new instance with the specified identifier, partition key, creation date, and timestamp.
+    /// Initializes a new instance with the specified identifier, partition key, row key, creation date, and timestamp.
     /// </summary>
     /// <param name="id">The unique identifier for the entity.</param>
     /// <param name="partitionKey">The partition key for the entity.</param>
+    /// <param name="rowKey">The row key for the entity.</param>
     /// <param name="createdOn">The creation date and time.</param>
     /// <param name="timestamp">The timestamp for concurrency and audit.</param>
-    internal DomainEntity(Guid id, string partitionKey, DateTime createdOn, DateTimeOffset timestamp)
-        : this(id, partitionKey)
+    internal DomainEntity(Guid id, string partitionKey, string rowKey, DateTime createdOn, DateTimeOffset timestamp)
+        : this(id, partitionKey, rowKey)
     {
         CreatedOn = createdOn;
         Timestamp = timestamp;
