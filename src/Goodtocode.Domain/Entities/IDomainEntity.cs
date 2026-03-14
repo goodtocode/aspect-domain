@@ -19,6 +19,11 @@ namespace Goodtocode.Domain.Entities;
     string PartitionKey { get; }
 
     /// <summary>
+    /// Gets the row key for the entity, used for Table Storage or similar stores.
+    /// </summary>
+    public string RowKey { get; }
+
+    /// <summary>
     /// Gets the timestamp of the last operation on the entity.
     /// </summary>
     DateTimeOffset Timestamp { get; }

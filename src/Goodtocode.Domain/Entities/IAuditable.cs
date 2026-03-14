@@ -23,12 +23,14 @@ public interface IAuditable
     /// <summary>
     /// Sets the date and time when the entity was last modified.
     /// </summary>
-    void MarkModified();
+    /// <param name="modifiedOn">The modification date/time.</param>
+    void MarkModified(DateTime modifiedOn);
 
     /// <summary>
     /// Marks the entity as deleted by setting the deletion timestamp, if not already deleted.
-    /// </summary>    
-    void MarkDeleted();
+    /// </summary>
+    /// <param name="deletedOn">The deletion date/time.</param>
+    void MarkDeleted(DateTime deletedOn);
 
     /// <summary>
     /// Marks the entity as undeleted by clearing the deletion timestamp, if currently deleted.

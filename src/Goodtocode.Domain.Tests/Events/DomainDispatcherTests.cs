@@ -12,7 +12,7 @@ public sealed class DomainDispatcherTests
         public DateTime OccurredOn => throw new NotImplementedException();
     }
 
-    private class TestHandler : IDomainHandler<TestEvent>
+    private sealed class TestHandler : IDomainHandler<TestEvent>
     {
         public bool WasCalled { get; private set; }
         public Task HandleAsync(TestEvent domainEvent)

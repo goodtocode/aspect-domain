@@ -15,7 +15,7 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     /// <summary>
     /// Gets the unique identifier for the entity.
     /// </summary>
-    public Guid Id { get; private set; } = Guid.NewGuid();
+    public Guid Id { get; private set; }
 
     /// <summary>
     /// Gets the partition key for the entity, used for CosmosDb, Table Storage, or similar stores.
@@ -30,7 +30,7 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     /// <summary>
     /// Gets the creation date and time of the entity.
     /// </summary>
-    public DateTime CreatedOn { get; private set; } = DateTime.UtcNow;
+    public DateTime CreatedOn { get; private set; }
 
     /// <summary>
     /// Gets the last modification date and time of the entity.
@@ -45,7 +45,7 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     /// <summary>
     /// Gets the timestamp for concurrency and audit purposes.
     /// </summary>
-    public DateTimeOffset Timestamp { get; private set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset Timestamp { get; private set; }
 
     /// <summary>
     /// Gets the list of domain events associated with this entity.
@@ -58,20 +58,26 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     /// </summary>
     protected DomainEntity()
     {
-        PartitionKey = Id.ToString();
-        RowKey = Id.ToString();
+        PartitionKey = string.Empty;
+        RowKey = string.Empty;
+        CreatedOn = default;
+        Timestamp = default;
     }
 
     /// <summary>
     /// Initializes a new instance with the specified identifier.
     /// </summary>
     /// <param name="id">The unique identifier for the entity.</param>
-    protected DomainEntity(Guid id)
+    /// <param name="createdOn">The creation date and time.</param>
+    /// <param name="timestamp">The timestamp for concurrency and audit.</param>
+    protected DomainEntity(Guid id, DateTime createdOn, DateTimeOffset timestamp)
         : this()
     {
         Id = id;
         PartitionKey = id.ToString();
         RowKey = id.ToString();
+        CreatedOn = createdOn;
+        Timestamp = timestamp;
     }
 
     /// <summary>
@@ -80,24 +86,14 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     /// <param name="id">The unique identifier for the entity.</param>
     /// <param name="partitionKey">The partition key for the entity.</param>
     /// <param name="rowKey">The row key for the entity (optional, defaults to id string).</param>
-    protected DomainEntity(Guid id, string partitionKey, string? rowKey = null)
-        : this(id)
-    {
-        PartitionKey = partitionKey;
-        RowKey = rowKey ?? id.ToString();
-    }
-
-    /// <summary>
-    /// Initializes a new instance with the specified identifier, partition key, row key, creation date, and timestamp.
-    /// </summary>
-    /// <param name="id">The unique identifier for the entity.</param>
-    /// <param name="partitionKey">The partition key for the entity.</param>
-    /// <param name="rowKey">The row key for the entity.</param>
     /// <param name="createdOn">The creation date and time.</param>
     /// <param name="timestamp">The timestamp for concurrency and audit.</param>
-    internal DomainEntity(Guid id, string partitionKey, string rowKey, DateTime createdOn, DateTimeOffset timestamp)
-        : this(id, partitionKey, rowKey)
+    protected DomainEntity(Guid id, string partitionKey, string? rowKey, DateTime createdOn, DateTimeOffset timestamp)
+        : this()
     {
+        Id = id;
+        PartitionKey = partitionKey;
+        RowKey = rowKey ?? id.ToString();
         CreatedOn = createdOn;
         Timestamp = timestamp;
     }
@@ -120,18 +116,19 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     }
 
     /// <summary>
-    /// Sets the last modification date and time of the entity to the current UTC time.
+    /// Sets the last modification date and time of the entity to the provided value.
     /// </summary>
-    public void MarkModified() => ModifiedOn = DateTime.UtcNow;
+    /// <param name="modifiedOn">The modification date and time.</param>
+    public void MarkModified(DateTime modifiedOn) => ModifiedOn = modifiedOn;
 
     /// <summary>
-    /// Sets the deletion date and time of the entity to the current UTC time.
+    /// Sets the deletion date and time of the entity to the provided value.
     /// </summary>
-    /// <param name="value">The deletion date and time.</param>
-    public void MarkDeleted()
+    /// <param name="deletedOn">The deletion date and time.</param>
+    public void MarkDeleted(DateTime deletedOn)
     {
         if (DeletedOn == null)
-            DeletedOn = DateTime.UtcNow;
+            DeletedOn = deletedOn;
     }
 
     /// <summary>
@@ -141,6 +138,16 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     {
         if (DeletedOn != null)
             DeletedOn = null;
+    }
+
+    /// <summary>
+    /// Sets the creation date and time of the entity if not already set.
+    /// </summary>
+    public virtual void MarkCreated(DateTime createdOn)
+    {
+        if (CreatedOn != default)
+            return;
+        CreatedOn = createdOn;
     }
 
     /// <summary>

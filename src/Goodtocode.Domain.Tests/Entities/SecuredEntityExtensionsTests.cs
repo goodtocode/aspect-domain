@@ -6,78 +6,41 @@ namespace Goodtocode.Domain.Tests.Entities;
 [TestClass]
 public sealed class SecuredEntityExtensionsTests
 {
-#pragma warning disable CA1822
     private sealed class TestSecuredEntity : ISecurable
     {
         public Guid OwnerId { get; set; }
         public Guid TenantId { get; set; }
-
-        // Implement IDomainEntity members
         public Guid Id { get; set; } = Guid.NewGuid();
         public string PartitionKey { get; set; } = string.Empty;
-        public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
-        public Guid CreatedBy { get; set; } = Guid.Empty;
+        public DateTime CreatedOn { get; set; }
+        public Guid CreatedBy { get; set; }
         public DateTime? ModifiedOn { get; set; }
         public Guid? ModifiedBy { get; set; }
         public DateTime? DeletedOn { get; set; }
         public Guid? DeletedBy { get; set; }
-        public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset Timestamp { get; set; }
 
+        public void ChangeOwner(Guid value) => OwnerId = value;
+        public void ChangeTenant(Guid value) => TenantId = value;
 
-#pragma warning disable IDE0060 // Remove unused parameter
-        public void AddDomainEvent(IDomainEvent<TestSecuredEntity> domainEvent)
-#pragma warning restore IDE0060 // Remove unused parameter
+        public void MarkCreated(Guid ownerId, DateTime createdOn)
         {
-            // No-op for test stub
-        }
-
-        public void ClearDomainEvents()
-        {
-            // No-op for test stub
-        }
-
-        public void ChangeOwner(Guid value)
-        {
-            OwnerId = value;
-        }
-
-        public void ChangeTenant(Guid value)
-        {
-            TenantId = value;
-        }
-
-        public void MarkModified()
-        {
-            ModifiedOn = DateTime.UtcNow;
-        }
-
-        public void MarkDeleted()
-        {
-            DeletedOn = DateTime.UtcNow;
-        }
-
-        public void MarkUndeleted()
-        {
-            DeletedOn = null;
-            DeletedBy = null;
-        }
-
-        public void MarkCreated(Guid ownerId)
-        {
-            CreatedOn = DateTime.UtcNow;
+            if (CreatedBy != Guid.Empty || CreatedOn != default)
+                return;
             CreatedBy = ownerId;
+            CreatedOn = createdOn;
         }
-
-        public void MarkModified(Guid ownerId)
+        public void MarkModified(Guid ownerId, DateTime modifiedOn)
         {
-            ModifiedOn = DateTime.UtcNow;
             ModifiedBy = ownerId;
+            ModifiedOn = modifiedOn;
         }
-
-        public void MarkDeleted(Guid ownerId)
+        public void MarkDeleted(Guid ownerId, DateTime deletedOn)
         {
-            DeletedOn = DateTime.UtcNow;
+            if (DeletedBy.HasValue || DeletedOn.HasValue)
+                return;
             DeletedBy = ownerId;
+            DeletedOn = deletedOn;
         }
     }
 
@@ -164,5 +127,4 @@ public sealed class SecuredEntityExtensionsTests
         Assert.Contains(x => x.OwnerId == ownerId, result);
         Assert.Contains(x => x.TenantId == tenantId, result);
     }
-#pragma warning restore CA1822
 }

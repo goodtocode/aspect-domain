@@ -28,24 +28,27 @@ public class RowLevelSecurityExample
         private Document() { }
 
         public Document(Guid id, Guid ownerId, Guid tenantId, string title, string content, bool isPublic = false)
-            : base(id, ownerId, tenantId)
+            : this(id, ownerId, tenantId, ownerId, DateTime.UtcNow, DateTime.UtcNow, title, content, isPublic)
+        {
+        }
+
+        public Document(Guid id, Guid ownerId, Guid tenantId, Guid createdBy, DateTime createdOn, DateTimeOffset timestamp, string title, string content, bool isPublic = false)
+            : base(id, ownerId, tenantId, createdBy, createdOn, timestamp)
         {
             Title = title;
             Content = content;
             IsPublic = isPublic;
         }
 
-        public void UpdateContent(string newContent, Guid modifiedBy)
+        public void UpdateContent(string newContent, Guid modifiedBy, DateTime modifiedOn)
         {
             Content = newContent;
-            this.MarkModified();
-            this.MarkModified(modifiedBy);
+            this.MarkModified(modifiedBy, modifiedOn);
         }
 
-        public void SoftDelete(Guid deletedBy)
+        public void SoftDelete(Guid deletedBy, DateTime deletedOn)
         {
-            this.MarkDeleted();
-            this.MarkDeleted(deletedBy);
+            this.MarkDeleted(deletedBy, deletedOn);
         }
     }
 
@@ -126,17 +129,17 @@ public class RowLevelSecurityExample
         var tenant2 = Guid.NewGuid();
         var user1 = Guid.NewGuid();
         var user2 = Guid.NewGuid();
-
+        var now = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
         var dbContext1 = new SecuredDbContext(user1, tenant1);
         var dbContext2 = new SecuredDbContext(user2, tenant2);
 
         // Create documents for different tenants
-        var doc1 = new Document(Guid.NewGuid(), user1, tenant1, "Tenant 1 Doc", "Secret content 1");
-        doc1.MarkCreated(user1);
+        var doc1 = new Document(Guid.NewGuid(), user1, tenant1, user1, now, now, "Tenant 1 Doc", "Secret content 1");
+        doc1.MarkCreated(user1, now);
         dbContext1.Add(doc1);
 
-        var doc2 = new Document(Guid.NewGuid(), user2, tenant2, "Tenant 2 Doc", "Secret content 2");
-        doc2.MarkCreated(user2);
+        var doc2 = new Document(Guid.NewGuid(), user2, tenant2, user2, now, now, "Tenant 2 Doc", "Secret content 2");
+        doc2.MarkCreated(user2, now);
         dbContext2.Add(doc2);
 
         // Act - Query with RLS filters
@@ -157,16 +160,16 @@ public class RowLevelSecurityExample
         var tenantId = Guid.NewGuid();
         var owner1 = Guid.NewGuid();
         var owner2 = Guid.NewGuid();
-
+        var now = new DateTime(2024, 1, 2, 12, 0, 0, DateTimeKind.Utc);
         var dbContextOwner1 = new SecuredDbContext(owner1, tenantId);
 
         // Create documents with different owners in same tenant
-        var doc1 = new Document(Guid.NewGuid(), owner1, tenantId, "Owner 1 Doc", "Private content", false);
-        doc1.MarkCreated(owner1);
+        var doc1 = new Document(Guid.NewGuid(), owner1, tenantId, owner1, now, now, "Owner 1 Doc", "Private content", false);
+        doc1.MarkCreated(owner1, now);
         dbContextOwner1.Add(doc1);
 
-        var doc2 = new Document(Guid.NewGuid(), owner2, tenantId, "Owner 2 Doc", "Private content", false);
-        doc2.MarkCreated(owner2);
+        var doc2 = new Document(Guid.NewGuid(), owner2, tenantId, owner2, now, now, "Owner 2 Doc", "Private content", false);
+        doc2.MarkCreated(owner2, now);
         dbContextOwner1.Add(doc2);
 
         // Act - Query with owner filter
@@ -185,16 +188,16 @@ public class RowLevelSecurityExample
         var tenantId = Guid.NewGuid();
         var owner1 = Guid.NewGuid();
         var owner2 = Guid.NewGuid();
-
+        var now = new DateTime(2024, 1, 3, 12, 0, 0, DateTimeKind.Utc);
         var dbContextOwner2 = new SecuredDbContext(owner2, tenantId);
 
         // Create public document by owner1
-        var publicDoc = new Document(Guid.NewGuid(), owner1, tenantId, "Public Doc", "Public content", true);
-        publicDoc.MarkCreated(owner1);
+        var publicDoc = new Document(Guid.NewGuid(), owner1, tenantId, owner1, now, now, "Public Doc", "Public content", true);
+        publicDoc.MarkCreated(owner1, now);
         dbContextOwner2.Add(publicDoc);
 
-        var privateDoc = new Document(Guid.NewGuid(), owner1, tenantId, "Private Doc", "Private content", false);
-        privateDoc.MarkCreated(owner1);
+        var privateDoc = new Document(Guid.NewGuid(), owner1, tenantId, owner1, now, now, "Private Doc", "Private content", false);
+        privateDoc.MarkCreated(owner1, now);
         dbContextOwner2.Add(privateDoc);
 
         // Act - Query as owner2
@@ -213,15 +216,15 @@ public class RowLevelSecurityExample
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var deleterId = Guid.NewGuid();
-
+        var now = new DateTime(2024, 1, 4, 12, 0, 0, DateTimeKind.Utc);
         var dbContext = new SecuredDbContext(userId, tenantId);
 
-        var doc = new Document(Guid.NewGuid(), userId, tenantId, "To Delete", "Content");
-        doc.MarkCreated(userId);
+        var doc = new Document(Guid.NewGuid(), userId, tenantId, userId, now, now, "To Delete", "Content");
+        doc.MarkCreated(userId, now);
         dbContext.Add(doc);
 
         // Act - Soft delete
-        doc.SoftDelete(deleterId);
+        doc.SoftDelete(deleterId, now.AddHours(1));
         var visibleDocs = dbContext.Documents.ToList();
         var allDocs = dbContext.AllDocumentsIncludingDeleted.ToList();
 
@@ -240,11 +243,11 @@ public class RowLevelSecurityExample
         var tenant2 = Guid.NewGuid();
         var user1 = Guid.NewGuid();
         var user2 = Guid.NewGuid();
-
+        var now = new DateTime(2024, 1, 5, 12, 0, 0, DateTimeKind.Utc);
         var dbContext = new SecuredDbContext(user1, tenant1);
 
-        var doc1 = new Document(Guid.NewGuid(), user1, tenant1, "Doc 1", "Content 1");
-        var doc2 = new Document(Guid.NewGuid(), user2, tenant2, "Doc 2", "Content 2");
+        var doc1 = new Document(Guid.NewGuid(), user1, tenant1, user1, now, now, "Doc 1", "Content 1");
+        var doc2 = new Document(Guid.NewGuid(), user2, tenant2, user2, now, now, "Doc 2", "Content 2");
         dbContext.Add(doc1);
         dbContext.Add(doc2);
 
@@ -267,19 +270,19 @@ public class RowLevelSecurityExample
         var creatorId = Guid.NewGuid();
         var editorId = Guid.NewGuid();
         var deleterId = Guid.NewGuid();
-
+        var now = new DateTime(2024, 1, 6, 12, 0, 0, DateTimeKind.Utc);
         var dbContext = new SecuredDbContext(creatorId, tenantId);
 
         // Act - Create
-        var doc = new Document(Guid.NewGuid(), creatorId, tenantId, "Document", "Original content");
-        doc.MarkCreated(creatorId);
+        var doc = new Document(Guid.NewGuid(), creatorId, tenantId, creatorId, now, now, "Document", "Original content");
+        doc.MarkCreated(creatorId, now);
         dbContext.Add(doc);
 
         // Act - Edit
-        doc.UpdateContent("Modified content", editorId);
+        doc.UpdateContent("Modified content", editorId, now.AddHours(1));
 
         // Act - Delete
-        doc.SoftDelete(deleterId);
+        doc.SoftDelete(deleterId, now.AddHours(2));
 
         // Assert - Complete audit trail
         Assert.AreEqual(creatorId, doc.CreatedBy, "Track creator");
@@ -309,22 +312,22 @@ public class RowLevelSecurityExample
         var tenant1User1 = Guid.NewGuid();
         var tenant1User2 = Guid.NewGuid();
         var tenant2User1 = Guid.NewGuid();
-
+        var now = new DateTime(2024, 1, 7, 12, 0, 0, DateTimeKind.Utc);
         var dbContext1U1 = new SecuredDbContext(tenant1User1, tenant1);
         var dbContext1U2 = new SecuredDbContext(tenant1User2, tenant1);
         var dbContext2U1 = new SecuredDbContext(tenant2User1, tenant2);
 
         // Create documents
-        var doc1 = new Document(Guid.NewGuid(), tenant1User1, tenant1, "T1U1 Doc", "Content", false);
-        doc1.MarkCreated(tenant1User1);
+        var doc1 = new Document(Guid.NewGuid(), tenant1User1, tenant1, tenant1User1, now, now, "T1U1 Doc", "Content", false);
+        doc1.MarkCreated(tenant1User1, now);
         dbContext1U1.Add(doc1);
 
-        var doc2 = new Document(Guid.NewGuid(), tenant1User2, tenant1, "T1U2 Doc", "Content", true); // Public
-        doc2.MarkCreated(tenant1User2);
+        var doc2 = new Document(Guid.NewGuid(), tenant1User2, tenant1, tenant1User2, now, now, "T1U2 Doc", "Content", true); // Public
+        doc2.MarkCreated(tenant1User2, now);
         dbContext1U1.Add(doc2);
 
-        var doc3 = new Document(Guid.NewGuid(), tenant2User1, tenant2, "T2U1 Doc", "Content", false);
-        doc3.MarkCreated(tenant2User1);
+        var doc3 = new Document(Guid.NewGuid(), tenant2User1, tenant2, tenant2User1, now, now, "T2U1 Doc", "Content", false);
+        doc3.MarkCreated(tenant2User1, now);
         dbContext2U1.Add(doc3);
 
         // Act & Assert - User 1 in Tenant 1
@@ -347,7 +350,7 @@ public class RowLevelSecurityExample
         var tenantId = Guid.NewGuid();
         var dataSubjectId = Guid.NewGuid();
         var dataProcessorId = Guid.NewGuid();
-
+        var now = new DateTime(2024, 1, 8, 12, 0, 0, DateTimeKind.Utc);
         var dbContext = new SecuredDbContext(dataSubjectId, tenantId);
 
         // Create personal data
@@ -355,17 +358,16 @@ public class RowLevelSecurityExample
             Guid.NewGuid(),
             dataSubjectId,
             tenantId,
+            dataSubjectId,
+            now,
+            now,
             "Personal Data",
             "Sensitive personal information");
-        // Set specific creation date for testing (using reflection for testing purposes only)
-        typeof(DomainEntity<Document>)
-            .GetProperty("CreatedOn")!
-            .SetValue(personalDoc, DateTime.UtcNow.AddDays(-100));
-        personalDoc.MarkCreated(dataSubjectId);
+        personalDoc.MarkCreated(dataSubjectId, now);
         dbContext.Add(personalDoc);
 
         // Data processor modifies data
-        personalDoc.UpdateContent("Updated personal information", dataProcessorId);
+        personalDoc.UpdateContent("Updated personal information", dataProcessorId, now.AddHours(1));
 
         // Act - Generate audit report (GDPR Art. 15 - Right to Access)
         var auditReport = new

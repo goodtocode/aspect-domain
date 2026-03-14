@@ -30,8 +30,17 @@ public class CommandHandlerWithEventsExample
 
         private Person() { } // EF constructor
 
-        public Person(Guid id, string firstName, string lastName, string email, Guid ownerId, Guid tenantId)
-            : base(id, ownerId, tenantId)
+        public Person(
+            Guid id,
+            string firstName,
+            string lastName,
+            string email,
+            Guid ownerId,
+            Guid tenantId,
+            Guid createdBy,
+            DateTime createdOn,
+            DateTimeOffset timestamp)
+            : base(id, ownerId, tenantId, createdBy, createdOn, timestamp)
         {
             FirstName = firstName;
             LastName = lastName;
@@ -42,26 +51,24 @@ public class CommandHandlerWithEventsExample
             AddDomainEvent(new PersonCreatedEvent(this));
         }
 
-        public void Verify()
+        public void Verify(Guid ownerId, DateTime modifiedOn)
         {
             if (!IsVerified)
             {
                 IsVerified = true;
-                this.MarkModified();
-
+                this.MarkModified(ownerId, modifiedOn);
                 // Add domain event for verification
                 AddDomainEvent(new PersonVerifiedEvent(this));
             }
         }
 
-        public void UpdateEmail(string newEmail)
+        public void UpdateEmail(string newEmail, Guid ownerId, DateTime modifiedOn)
         {
             if (Email != newEmail)
             {
                 var oldEmail = Email;
                 Email = newEmail;
-                this.MarkModified();
-
+                this.MarkModified(ownerId, modifiedOn);
                 // Add domain event for email change
                 AddDomainEvent(new PersonEmailChangedEvent(this, oldEmail, newEmail));
             }
@@ -260,13 +267,18 @@ public class CommandHandlerWithEventsExample
         public async Task<Guid> Handle(CreatePersonCommand command)
         {
             // 1. Create the domain entity (aggregate root)
+            var now = DateTime.UtcNow;
             var person = new Person(
                 Guid.NewGuid(),
                 command.FirstName,
                 command.LastName,
                 command.Email,
                 command.OwnerId,
-                command.TenantId);
+                command.TenantId,
+                command.OwnerId, // createdBy
+                now, // createdOn
+                now // timestamp
+            );
 
             // 2. Add to DbContext (repository pattern)
             _dbContext.Persons.Add(person);
@@ -298,20 +310,16 @@ public class CommandHandlerWithEventsExample
         {
             // 1. Load entity from repository
             var person = _dbContext.Persons.FirstOrDefault(p => p.Id == command.PersonId) ?? throw new InvalidOperationException($"Person {command.PersonId} not found");
-
+            var now = DateTime.UtcNow;
             // 2. Execute domain logic (this adds PersonVerifiedEvent)
-            person.Verify();
-
+            person.Verify(person.OwnerId, now);
             // 3. Additional operations that add more events
-            person.UpdateEmail(person.Email.ToLowerInvariant()); // This adds PersonEmailChangedEvent
-
+            person.UpdateEmail(person.Email.ToLowerInvariant(), person.OwnerId, now); // This adds PersonEmailChangedEvent
             // 4. Save changes
             await _dbContext.SaveChangesAsync();
-
             // 5. Dispatch ALL accumulated events
             // Note: Person now has 2 events (PersonVerified + PersonEmailChanged)
             await _dispatcher.DispatchAsync(person.DomainEvents);
-
             // 6. Clear events
             person.ClearDomainEvents();
         }
@@ -374,15 +382,18 @@ public class CommandHandlerWithEventsExample
         // Arrange - Create person first
         var dbContext = new InMemoryDbContext();
         var serviceBus = new MockServiceBusPublisher();
-
+        var now = DateTime.UtcNow;
         var person = new Person(
             Guid.NewGuid(),
             "Jane",
             "Smith",
             "Jane.Smith@Example.com", // Mixed case to test email change
             Guid.NewGuid(),
-            Guid.NewGuid());
-
+            Guid.NewGuid(),
+            Guid.NewGuid(), // createdBy
+            now,
+            now
+        );
         dbContext.Persons.Add(person);
         person.ClearDomainEvents(); // Clear creation event
 
@@ -443,7 +454,8 @@ public class CommandHandlerWithEventsExample
             "User",
             "test@example.com",
             Guid.NewGuid(),
-            Guid.NewGuid());
+            Guid.NewGuid()
+        );
 
         // Act & Assert - Should throw exception when service bus fails
         await Assert.ThrowsAsync<InvalidOperationException>(

@@ -33,22 +33,25 @@ public interface ISecurable
     Guid? DeletedBy { get; }
 
     /// <summary>
-    /// Sets the identifier of the user who created the entity.
+    /// Sets the identifier of the user who created the entity and the creation date/time.
     /// </summary>
     /// <param name="ownerId">The user identifier.</param>
-    void MarkCreated(Guid ownerId);
+    /// <param name="createdOn">The creation date/time.</param>
+    void MarkCreated(Guid ownerId, DateTime createdOn);
 
     /// <summary>
-    /// Sets the identifier of the user who last modified the entity.
+    /// Sets the identifier of the user who last modified the entity and the modification date/time.
     /// </summary>
     /// <param name="ownerId">The user identifier.</param>
-    void MarkModified(Guid ownerId);
+    /// <param name="modifiedOn">The modification date/time.</param>
+    void MarkModified(Guid ownerId, DateTime modifiedOn);
 
     /// <summary>
-    /// Sets the identifier of the user who deleted the entity.
+    /// Sets the identifier of the user who deleted the entity and the deletion date/time.
     /// </summary>
     /// <param name="ownerId">The user identifier.</param>
-    void MarkDeleted(Guid ownerId);
+    /// <param name="deletedOn">The deletion date/time.</param>
+    void MarkDeleted(Guid ownerId, DateTime deletedOn);
 
     /// <summary>
     /// Changes the owner identifier for the entity.
