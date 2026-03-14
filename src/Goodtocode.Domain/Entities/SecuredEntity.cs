@@ -8,16 +8,6 @@
 public abstract class SecuredEntity<TModel> : DomainEntity<TModel>, ISecurable
 {
     /// <summary>
-    /// Gets the partition key for the entity, defaults to TenantId for multi-tenant data isolation.
-    /// </summary>
-    public new string PartitionKey => TenantId.ToString();
-
-    /// <summary>
-    /// Gets the row key for the entity, defaults to Id for unique identification within a partition.
-    /// </summary>
-    public new string RowKey => Id.ToString();
-
-    /// <summary>
     /// Gets the owner identifier (ObjectId/OID) for the entity.
     /// </summary>
     public Guid OwnerId { get; private set; }
@@ -67,7 +57,28 @@ public abstract class SecuredEntity<TModel> : DomainEntity<TModel>, ISecurable
     /// <param name="createdOn">The creation timestamp for the entity.</param>
     /// <param name="timestamp">The last modified timestamp for the entity.</param>
     protected SecuredEntity(Guid id, Guid ownerId, Guid tenantId, Guid createdBy, DateTime createdOn, DateTimeOffset timestamp)
-        : base(id, createdOn, timestamp)
+        : base(id, tenantId.ToString(), id.ToString(), createdOn, timestamp)
+    {
+        OwnerId = ownerId;
+        TenantId = tenantId;
+        CreatedBy = createdBy;
+        ModifiedBy = null;
+        DeletedBy = null;
+    }
+
+    /// <summary>
+    /// Initializes a new instance with all keys and audit fields explicitly set.
+    /// </summary>
+    /// <param name="id">The unique identifier for the entity.</param>
+    /// <param name="partitionKey">The partition key for the entity.</param>
+    /// <param name="rowKey">The row key for the entity.</param>
+    /// <param name="ownerId">The owner identifier.</param>
+    /// <param name="tenantId">The tenant identifier.</param>
+    /// <param name="createdBy">The identifier of the user who created the entity.</param>
+    /// <param name="createdOn">The creation timestamp for the entity.</param>
+    /// <param name="timestamp">The last modified timestamp for the entity.</param>
+    protected SecuredEntity(Guid id, string partitionKey, string? rowKey, Guid ownerId, Guid tenantId, Guid createdBy, DateTime createdOn, DateTimeOffset timestamp)
+        : base(id, partitionKey, rowKey, createdOn, timestamp)
     {
         OwnerId = ownerId;
         TenantId = tenantId;
