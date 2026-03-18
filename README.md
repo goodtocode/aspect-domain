@@ -230,10 +230,11 @@ See the fully working examples in the test project:
 
 ## Version History
 
-| Version | Date        | Release Notes     |
-|---------|-------------|-------------------|
-| 1.0.0   | 2026-Jan-19 | Initial release   |
-| 1.2.0   | 2026-Mar-14 | Added rowKey support |
+| Version | Date        | Release Notes                 |
+|---------|-------------|-------------------------------|
+| 1.0.0   | 2026-Jan-19 | Initial release               |
+| 1.2.0   | 2026-Mar-14 | Added rowKey support          |
+| 1.3.0   | 2026-Mar-18 | Versioning, pinning, freezing |
 
 ## License
 
