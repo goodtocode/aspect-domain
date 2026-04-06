@@ -4,7 +4,7 @@ Domain-Driven Design (DDD) base library for .NET Standard 2.1 and modern .NET pr
 
 [![NuGet CI/CD](https://github.com/goodtocode/aspect-domain/actions/workflows/gtc-domain-nuget.yml/badge.svg)](https://github.com/goodtocode/aspect-domain/actions/workflows/gtc-domain-nuget.yml)
 
-Goodtocode.Domain provides foundational types for building DDD, clean architecture, and event-driven systems. It includes base classes for domain entities, audit fields, domain events, and secured/multi-tenant entities. The library is lightweight, dependency-free, and designed to work with EF Core, Cosmos DB, Table Storage, or custom repositories.
+Goodtocode.Domain provides foundational types for building DDD, clean architecture, and event-driven systems. It includes base classes for domain entities, audit fields, domain events, secured/multi-tenant entities, and immutable versioned entities with full lifecycle management. The library is lightweight, dependency-free, and designed to work with EF Core, Cosmos DB, Table Storage, or custom repositories.
 
 ## Target Frameworks
 - Library: `netstandard2.1`
@@ -14,10 +14,14 @@ Goodtocode.Domain provides foundational types for building DDD, clean architectu
 - Domain entity base with audit fields (`CreatedOn`, `ModifiedOn`, `DeletedOn`, `Timestamp`)
 - Domain event pattern and dispatcher (`IDomainEvent`, `IDomainHandler`, `DomainDispatcher`)
 - Equality and identity management for aggregate roots
-- Partition key and row key support for document/table stores (`PartitionKey` and `RowKey` both default to `Id.ToString()` unless specified)
+- UUIDv7-based `RowKey` for time-ordered, chronologically sortable storage keys
+- Partition key and row key support for document/table stores (`PartitionKey` defaults to `Id.ToString()`; `RowKey` is always a new UUIDv7 — distinct from `Id`)
 - Secured entity base for multi-tenancy and ownership (`OwnerId`, `TenantId`, `CreatedBy`, `ModifiedBy`, `DeletedBy`)
 - Extension methods for authorization and ownership queries
 - **Invariant state protection** for audit and security fields (fields are only set if not already set, ensuring consistency and preventing accidental overwrites)
+- **Immutable versioned entities** via `SecuredVersionedEntity<TModel>`: all state changes produce new rows; no in-place mutation after persistence
+- Full versioning lifecycle: `CreateNextVersion()`, `CreateSuccessor()`, `Freeze()`, `MarkNotLatest()`
+- Abstract factory pattern (`CreateNextVersionCore` / `CreateSuccessorCore`) keeps derived classes in control of construction
 
 ## Install
 ```bash
@@ -42,10 +46,26 @@ dotnet add package Goodtocode.Domain
 
 ## Core Concepts
 - `DomainEntity<TModel>`: Base entity with audit fields (`CreatedOn`, `ModifiedOn`, `DeletedOn`, `Timestamp`), identity (`Id`), partition key, row key, and domain event tracking.
-- `PartitionKey` and `RowKey` both default to `Id.ToString()` unless explicitly set. This supports portability across Cosmos DB, Table Storage, and other stores. If you do not specify a value, both will be the same by default.
+- `RowKey` is always a new **UUIDv7** (time-ordered, RFC 4122). It is intentionally distinct from `Id`. `PartitionKey` defaults to `Id.ToString()` unless explicitly set. This supports portability across Cosmos DB, Table Storage, and other stores.
 - `SecuredEntity<TModel>`: Extends `DomainEntity<TModel>` with `OwnerId`, `TenantId`, and audit fields for user actions (`CreatedBy`, `ModifiedBy`, `DeletedBy`). `PartitionKey` defaults to `TenantId.ToString()` for multi-tenant isolation.
 - **Invariant state protection**: Methods like `MarkCreated`, `MarkDeleted`, etc. only set fields if not already set, ensuring entity state is consistent and protected from accidental changes.
+- `SecuredVersionedEntity<TModel>`: Extends `SecuredEntity<TModel>` and implements `IVersionable`. All persisted rows are **immutable** — state changes always produce new rows. `PartitionKey` is `TenantId:CanonicalKey`, grouping all versions of a logical entity in the same partition.
+- `IVersionable`: Read-only state contract — `CanonicalKey`, `Version`, `PreviousVersionId`, `IsLatest`, `IsPinned`, `IsFrozen`. No mutation methods on the interface.
 - Domain events: Implement `IDomainEvent<TModel>` and dispatch with `DomainDispatcher`.
+
+## Versioning Lifecycle & Invariants
+
+`SecuredVersionedEntity<TModel>` enforces the following invariants:
+
+| Rule | Detail |
+|------|--------|
+| Rows are immutable | Once persisted, a row's fields never change (except `IsLatest` and `IsFrozen` via `MarkNotLatest`/`Freeze`) |
+| New version = new row | `CreateNextVersion()` returns a new row with a new `Id`, new UUIDv7 `RowKey`, incremented `Version`, and `PreviousVersionId` pointing to the current row |
+| `IsLatest` is caller-managed | The caller must call `MarkNotLatest()` on the previous row and persist both rows **transactionally** |
+| Frozen series cannot version | `CreateNextVersion()` throws `InvalidOperationException` when `IsFrozen = true` |
+| Successors start fresh | `CreateSuccessor(newCanonicalKey)` starts a new series: `Version = 1`, `PreviousVersionId = null`, same `TenantId`/`OwnerId` |
+| Successors are always allowed | `CreateSuccessor()` is permitted even on a frozen series |
+| Derived classes own construction | `CreateNextVersionCore()` and `CreateSuccessorCore()` are `abstract` — the concrete class supplies the new instance |
 
 ## Key Examples
 
@@ -146,6 +166,76 @@ await dispatcher.DispatchAsync(person.DomainEvents);
 person.ClearDomainEvents();
 ```
 
+### 4. Versioned Entity Lifecycle (Immutable Pattern)
+
+`SecuredVersionedEntity<TModel>` uses the **Template Method** pattern. Your derived class provides `CreateNextVersionCore()` and `CreateSuccessorCore()`; the base class enforces all invariants.
+
+```csharp
+using Goodtocode.Domain.Entities;
+
+public sealed class Invoice : SecuredVersionedEntity<Invoice>
+{
+    public decimal Amount { get; private set; }
+    public string Status { get; private set; } = string.Empty;
+
+    // Required by ORM / serialization
+    private Invoice() { }
+
+    public Invoice(
+        Guid id, string canonicalKey, Guid ownerId, Guid tenantId, Guid createdBy,
+        DateTime createdOn, DateTimeOffset timestamp,
+        int version, Guid? previousVersionId, bool isLatest, bool isPinned, bool isFrozen,
+        decimal amount, string status)
+        : base(id, canonicalKey, null, ownerId, tenantId, createdBy,
+               createdOn, timestamp, version, previousVersionId, isLatest, isPinned, isFrozen)
+    {
+        Amount = amount;
+        Status = status;
+    }
+
+    protected override Invoice CreateNextVersionCore() =>
+        new(Guid.NewGuid(), CanonicalKey, OwnerId, TenantId, CreatedBy,
+            DateTime.UtcNow, DateTimeOffset.UtcNow,
+            Version + 1, Id, isLatest: true, isPinned: false, isFrozen: false,
+            Amount, Status);
+
+    protected override Invoice CreateSuccessorCore(string newCanonicalKey) =>
+        new(Guid.NewGuid(), newCanonicalKey, OwnerId, TenantId, CreatedBy,
+            DateTime.UtcNow, DateTimeOffset.UtcNow,
+            1, null, isLatest: true, isPinned: false, isFrozen: false,
+            Amount, Status);
+}
+```
+
+```csharp
+// --- Create version 1 ---
+var v1 = new Invoice(Guid.NewGuid(), "INV-2026-001", ownerId, tenantId, createdBy,
+    DateTime.UtcNow, DateTimeOffset.UtcNow,
+    1, null, isLatest: true, isPinned: false, isFrozen: false,
+    amount: 100m, status: "Draft");
+
+// --- Produce version 2 (new row, v1 stays unchanged) ---
+var v2 = v1.CreateNextVersion();
+// Transactionally: persist v2, then mark v1 as no longer latest
+v1.MarkNotLatest();
+// persist both: v1 (IsLatest=false) and v2 (IsLatest=true)
+
+// --- Freeze the series (no more versions allowed) ---
+v2.Freeze();
+
+// --- Successor starts a new canonical key series ---
+var successor = v2.CreateSuccessor("INV-2027-001");
+// successor: Version=1, PreviousVersionId=null, CanonicalKey="INV-2027-001"
+v2.MarkNotLatest();
+// persist both: v2 (IsLatest=false) and successor (IsLatest=true)
+```
+
+**Key invariants to remember:**
+- `RowKey` on every row is a new UUIDv7 — never equal to `Id`
+- `PartitionKey` = `TenantId:CanonicalKey` — all versions of the same entity land in the same partition
+- `IsLatest` flip is **your responsibility** — call `MarkNotLatest()` on the outgoing row inside your transaction
+- `CreateNextVersion()` throws if `IsFrozen = true`
+- `CreateSuccessor()` always succeeds, even on a frozen series
 
 ---
 
@@ -230,11 +320,13 @@ See the fully working examples in the test project:
 
 ## Version History
 
-| Version | Date        | Release Notes                 |
-|---------|-------------|-------------------------------|
-| 1.0.0   | 2026-Jan-19 | Initial release               |
-| 1.2.0   | 2026-Mar-14 | Added rowKey support          |
-| 1.3.0   | 2026-Mar-18 | Versioning, pinning, freezing |
+| Version | Date        | Release Notes                                        |
+|---------|-------------|------------------------------------------------------|
+| 1.0.0   | 2026-Jan-19 | Initial release                                      |
+| 1.2.0   | 2026-Mar-14 | Added rowKey support                                 |
+| 1.3.0   | 2026-Mar-18 | Versioning, pinning, freezing                        |
+| 1.4.0   | 2026-Apr-05 | Versioning lifecycle and invariants                  |
+| 1.5.0   | 2026-Apr-19 | Immutable versioning: UUID7 RowKey, CanonicalKey, SecuredVersionedEntity lifecycle (CreateNextVersion, CreateSuccessor, Freeze, MarkNotLatest), abstract factory pattern, IVersionable read-only contract |
 
 ## License
 

@@ -75,7 +75,7 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     {
         Id = id;
         PartitionKey = id.ToString();
-        RowKey = id.ToString();
+        RowKey = Uuid7.New().ToString();
         CreatedOn = createdOn;
         Timestamp = timestamp;
     }
@@ -93,7 +93,7 @@ public abstract class DomainEntity<TModel> : IDomainEntity<TModel>
     {
         Id = id;
         PartitionKey = partitionKey;
-        RowKey = rowKey ?? id.ToString();
+        RowKey = rowKey ?? Uuid7.New().ToString();
         CreatedOn = createdOn;
         Timestamp = timestamp;
     }

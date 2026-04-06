@@ -29,7 +29,8 @@ public sealed class DomainEntityConstructorTests
         Assert.IsNotNull(entity);
         Assert.AreEqual(id, entity.Id);
         Assert.AreEqual(id.ToString(), entity.PartitionKey);
-        Assert.AreEqual(id.ToString(), entity.RowKey);
+        Assert.IsTrue(Guid.TryParse(entity.RowKey, out _), "RowKey should be a valid UUID");
+        Assert.AreNotEqual(id.ToString(), entity.RowKey, "RowKey should be UUID7, not the entity Id");
         Assert.AreEqual(createdOn, entity.CreatedOn);
         Assert.AreEqual(timestamp, entity.Timestamp);
     }
