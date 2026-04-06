@@ -57,7 +57,7 @@ public abstract class SecuredEntity<TModel> : DomainEntity<TModel>, ISecurable
     /// <param name="createdOn">The creation timestamp for the entity.</param>
     /// <param name="timestamp">The last modified timestamp for the entity.</param>
     protected SecuredEntity(Guid id, Guid ownerId, Guid tenantId, Guid createdBy, DateTime createdOn, DateTimeOffset timestamp)
-        : base(id, tenantId.ToString(), id.ToString(), createdOn, timestamp)
+        : base(id, tenantId.ToString(), null, createdOn, timestamp)
     {
         OwnerId = ownerId;
         TenantId = tenantId;

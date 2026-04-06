@@ -3,53 +3,73 @@ using System;
 namespace Goodtocode.Domain.Entities;
 
 /// <summary>
-/// Base class for secured and versioned domain entities, extending <see cref="SecuredEntity{TModel}"/>.
-/// Provides versioning and previous version tracking for immutable/auditable entities.
+/// Base class for secured, versioned, and immutable domain entities.
+/// <para>
+/// <b>Invariants:</b>
+/// <list type="bullet">
+///   <item>Persisted rows are immutable.</item>
+///   <item>New versions are new rows.</item>
+///   <item>Versioning is only possible via <see cref="CreateNextVersion"/>.</item>
+///   <item>Frozen series cannot be versioned.</item>
+///   <item>Successors require a new <see cref="CanonicalKey"/>.</item>
+///   <item><see cref="RowKey"/> is opaque and never meaningful.</item>
+///   <item><see cref="PartitionKey"/> is <c>TenantId:CanonicalKey</c> and immutable.</item>
+/// </list>
+/// </para>
 /// </summary>
 /// <typeparam name="TModel">The type of the domain model.</typeparam>
 public abstract class SecuredVersionedEntity<TModel> : SecuredEntity<TModel>, IVersionable
 {
     /// <summary>
-    /// Gets the version number of the entity.
+    /// Gets the logical identity key that anchors this version series within the tenant.
+    /// All versions of the same entity share the same CanonicalKey.
+    /// PartitionKey is computed as <c>TenantId:CanonicalKey</c>.
     /// </summary>
-    public int Version { get; protected set; } = 1;
+    public string CanonicalKey { get; private set; } = string.Empty;
 
     /// <summary>
-    /// Gets the identifier of the previous version of this entity, if any.
+    /// Gets the 1-based version number within the <see cref="CanonicalKey"/> series.
     /// </summary>
-    public Guid? PreviousVersionId { get; protected set; }
+    public int Version { get; private set; } = 1;
 
     /// <summary>
-    /// Gets a value indicating whether the entity is pinned.
+    /// Gets the <see cref="DomainEntity{TModel}.Id"/> of the preceding row in this series, or null for the first version.
     /// </summary>
-    public bool IsPinned { get; protected set; }
+    public Guid? PreviousVersionId { get; private set; }
 
     /// <summary>
-    /// Gets a value indicating whether the entity is frozen.
+    /// Gets a value indicating whether this row is the current latest version in its series.
+    /// Exactly one row per <see cref="CanonicalKey"/> should have IsLatest = true at any time.
     /// </summary>
-    public bool IsFrozen { get; protected set; }
+    public bool IsLatest { get; private set; } = true;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="SecuredVersionedEntity{TModel}"/> class.
+    /// Gets a value indicating whether this version is pinned.
+    /// Changing the pinned state always produces a new row via <see cref="CreateNextVersion"/>.
+    /// </summary>
+    public bool IsPinned { get; private set; }
+
+    /// <summary>
+    /// Gets a value indicating whether this series is frozen.
+    /// Set via <see cref="Freeze"/>. When true, <see cref="CreateNextVersion"/> throws.
+    /// <see cref="CreateSuccessor"/> remains allowed even when frozen.
+    /// </summary>
+    public bool IsFrozen { get; private set; }
+
+    /// <summary>
+    /// Initializes a new instance for ORM/serialization only. Does not generate keys.
     /// </summary>
     protected SecuredVersionedEntity() : base() { }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="SecuredVersionedEntity{TModel}"/> class with specified values.
+    /// Initializes a new instance with all fields set explicitly.
+    /// Use this constructor for reconstruction from storage or within factory methods.
+    /// Pass <c>null</c> for <paramref name="rowKey"/> to auto-generate a new UUIDv7.
+    /// <see cref="DomainEntity{TModel}.PartitionKey"/> is computed as <c>TenantId:CanonicalKey</c>.
     /// </summary>
-    /// <param name="id">The unique identifier of the entity.</param>
-    /// <param name="partitionKey">The partition key for storage.</param>
-    /// <param name="rowKey">The row key for storage (optional).</param>
-    /// <param name="ownerId">The identifier of the owner.</param>
-    /// <param name="tenantId">The identifier of the tenant.</param>
-    /// <param name="createdBy">The identifier of the creator.</param>
-    /// <param name="createdOn">The creation date and time.</param>
-    /// <param name="timestamp">The timestamp for concurrency.</param>
-    /// <param name="version">The version number of the entity.</param>
-    /// <param name="previousVersionId">The identifier of the previous version, if any.</param>
     protected SecuredVersionedEntity(
         Guid id,
-        string partitionKey,
+        string canonicalKey,
         string? rowKey,
         Guid ownerId,
         Guid tenantId,
@@ -57,40 +77,77 @@ public abstract class SecuredVersionedEntity<TModel> : SecuredEntity<TModel>, IV
         DateTime createdOn,
         DateTimeOffset timestamp,
         int version,
-        Guid? previousVersionId = null)
-        : base(id, partitionKey, rowKey, ownerId, tenantId, createdBy, createdOn, timestamp)
+        Guid? previousVersionId,
+        bool isLatest,
+        bool isPinned,
+        bool isFrozen)
+        : base(id, $"{tenantId}:{canonicalKey}", rowKey, ownerId, tenantId, createdBy, createdOn, timestamp)
     {
+        CanonicalKey = canonicalKey;
         Version = version;
         PreviousVersionId = previousVersionId;
+        IsLatest = isLatest;
+        IsPinned = isPinned;
+        IsFrozen = isFrozen;
     }
 
     /// <summary>
-    /// Pins the entity, marking it as pinned.
+    /// Freezes this series, preventing new versions from being created.
+    /// <see cref="CreateSuccessor"/> remains allowed after freezing.
     /// </summary>
-    public virtual void Pin() => IsPinned = true;
+    public void Freeze() => IsFrozen = true;
 
     /// <summary>
-    /// Freezes the entity, marking it as frozen. Pins the entity if not already pinned.
+    /// Marks this row as no longer the latest version in its series.
+    /// Must be called transactionally by the caller when a new version or successor is created.
     /// </summary>
-    public virtual void Freeze()
+    public void MarkNotLatest() => IsLatest = false;
+
+    /// <summary>
+    /// Creates a new version row in the same series as this entity.
+    /// The new row has a new <see cref="DomainEntity{TModel}.Id"/>, a new UUIDv7 <see cref="DomainEntity{TModel}.RowKey"/>,
+    /// the same <see cref="CanonicalKey"/>, <see cref="Version"/> incremented by 1,
+    /// <see cref="PreviousVersionId"/> set to this row's <see cref="DomainEntity{TModel}.Id"/>,
+    /// and <see cref="IsLatest"/> = true.
+    /// </summary>
+    /// <returns>The new version entity.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the series is frozen.</exception>
+    public TModel CreateNextVersion()
     {
-        if (!IsPinned)
-            Pin();
-        IsFrozen = true;
+        if (IsFrozen)
+            throw new InvalidOperationException($"Cannot create a new version of a frozen entity (CanonicalKey: {CanonicalKey}).");
+        return CreateNextVersionCore();
     }
 
     /// <summary>
-    /// Thaws the entity, unmarking it as frozen.
+    /// Creates a successor entity in a new series identified by <paramref name="newCanonicalKey"/>.
+    /// The new row has a new <see cref="DomainEntity{TModel}.Id"/>, a new UUIDv7 <see cref="DomainEntity{TModel}.RowKey"/>,
+    /// a new <see cref="DomainEntity{TModel}.PartitionKey"/> (<c>TenantId:newCanonicalKey</c>),
+    /// <see cref="Version"/> = 1, <see cref="PreviousVersionId"/> = null, and <see cref="IsLatest"/> = true.
+    /// Allowed even when the current series is frozen.
     /// </summary>
-    public virtual void Thaw() => IsFrozen = false;
-
-    /// <summary>
-    /// Increments the version number and sets the previous version identifier.
-    /// </summary>
-    /// <param name="previousVersionId">The identifier of the previous version, or null if not applicable.</param>
-    public virtual void BumpVersion(Guid? previousVersionId = null)
+    /// <param name="newCanonicalKey">The canonical key for the new successor series.</param>
+    /// <returns>The successor entity.</returns>
+    public TModel CreateSuccessor(string newCanonicalKey)
     {
-        Version++;
-        PreviousVersionId = previousVersionId;
+        if (string.IsNullOrWhiteSpace(newCanonicalKey))
+            throw new ArgumentException("newCanonicalKey cannot be null or whitespace.", nameof(newCanonicalKey));
+        return CreateSuccessorCore(newCanonicalKey);
     }
+
+    /// <summary>
+    /// Derived classes implement this to construct the next version row.
+    /// The implementation must supply: new Id, null rowKey (UUID7), same CanonicalKey, same TenantId/OwnerId,
+    /// Version = <see cref="Version"/> + 1, PreviousVersionId = <see cref="DomainEntity{TModel}.Id"/>,
+    /// isLatest = true, isPinned = false, isFrozen = false.
+    /// </summary>
+    protected abstract TModel CreateNextVersionCore();
+
+    /// <summary>
+    /// Derived classes implement this to construct the successor row.
+    /// The implementation must supply: new Id, null rowKey (UUID7), the provided newCanonicalKey,
+    /// same TenantId/OwnerId, version = 1, previousVersionId = null,
+    /// isLatest = true, isPinned = false, isFrozen = false.
+    /// </summary>
+    protected abstract TModel CreateSuccessorCore(string newCanonicalKey);
 }
