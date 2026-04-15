@@ -132,7 +132,9 @@ public abstract class SecuredVersionedEntity<TModel> : SecuredEntity<TModel>, IV
     {
         if (string.IsNullOrWhiteSpace(newCanonicalKey))
             throw new ArgumentException("newCanonicalKey cannot be null or whitespace.", nameof(newCanonicalKey));
-        return CreateSuccessorCore(newCanonicalKey);
+        var successor = CreateSuccessorCore(newCanonicalKey);
+        OnSuccessorCreated((TModel)(object)this, successor);
+        return successor;
     }
 
     /// <summary>
@@ -150,4 +152,16 @@ public abstract class SecuredVersionedEntity<TModel> : SecuredEntity<TModel>, IV
     /// isLatest = true, isPinned = false, isFrozen = false.
     /// </summary>
     protected abstract TModel CreateSuccessorCore(string newCanonicalKey);
+
+    /// <summary>
+    /// Optional extension point invoked immediately after a successor is created.
+    /// No-op by default. Override to emit domain events or record narrative supersession.
+    /// Does not create relationships or persist anything.
+    /// </summary>
+    /// <param name="predecessor">The entity from which the successor was created (this instance).</param>
+    /// <param name="successor">The newly created successor entity.</param>
+    protected virtual void OnSuccessorCreated(TModel predecessor, TModel successor)
+    {
+        // No-op by default. Override in derived types to handle narrative supersession.
+    }
 }

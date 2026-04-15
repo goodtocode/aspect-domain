@@ -308,4 +308,102 @@ public sealed class SecuredVersionedEntityTests
         Assert.AreEqual(entity.IsPinned, versionable.IsPinned);
         Assert.AreEqual(entity.IsFrozen, versionable.IsFrozen);
     }
+
+    private sealed class HookedSecuredVersionedEntity : SecuredVersionedEntity<HookedSecuredVersionedEntity>
+    {
+        public (HookedSecuredVersionedEntity? Predecessor, HookedSecuredVersionedEntity? Successor)? LastHookArgs { get; private set; }
+
+        public HookedSecuredVersionedEntity() : base() { }
+        public HookedSecuredVersionedEntity(
+            Guid id,
+            string canonicalKey,
+            string? rowKey,
+            Guid ownerId,
+            Guid tenantId,
+            Guid createdBy,
+            DateTime createdOn,
+            DateTimeOffset timestamp,
+            int version,
+            Guid? previousVersionId,
+            bool isLatest,
+            bool isPinned,
+            bool isFrozen)
+            : base(id, canonicalKey, rowKey, ownerId, tenantId, createdBy, createdOn, timestamp,
+                   version, previousVersionId, isLatest, isPinned, isFrozen) { }
+
+        protected override HookedSecuredVersionedEntity CreateNextVersionCore() =>
+            new(Guid.NewGuid(), CanonicalKey, null, OwnerId, TenantId, CreatedBy,
+                DateTime.UtcNow, DateTimeOffset.UtcNow,
+                Version + 1, Id, isLatest: true, isPinned: false, isFrozen: false);
+
+        protected override HookedSecuredVersionedEntity CreateSuccessorCore(string newCanonicalKey) =>
+            new(Guid.NewGuid(), newCanonicalKey, null, OwnerId, TenantId, CreatedBy,
+                DateTime.UtcNow, DateTimeOffset.UtcNow,
+                1, null, isLatest: true, isPinned: false, isFrozen: false);
+
+        protected override void OnSuccessorCreated(HookedSecuredVersionedEntity predecessor, HookedSecuredVersionedEntity successor)
+        {
+            LastHookArgs = (predecessor, successor);
+        }
+    }
+
+    [TestMethod]
+    public void OnSuccessorCreatedIsCalledWithCorrectArguments()
+    {
+        var entity = new HookedSecuredVersionedEntity(
+            Guid.NewGuid(), "hook-key", null, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            DateTime.UtcNow, DateTimeOffset.UtcNow, 1, null, true, false, false);
+
+        var successor = entity.CreateSuccessor("hook-key-successor");
+
+        Assert.IsNotNull(entity.LastHookArgs);
+        Assert.AreSame(entity, entity.LastHookArgs.Value.Predecessor);
+        Assert.AreSame(successor, entity.LastHookArgs.Value.Successor);
+        Assert.AreEqual("hook-key-successor", successor.CanonicalKey);
+    }
+
+    private sealed class NoopSecuredVersionedEntity : SecuredVersionedEntity<NoopSecuredVersionedEntity>
+    {
+        public NoopSecuredVersionedEntity() : base() { }
+        public NoopSecuredVersionedEntity(
+            Guid id,
+            string canonicalKey,
+            string? rowKey,
+            Guid ownerId,
+            Guid tenantId,
+            Guid createdBy,
+            DateTime createdOn,
+            DateTimeOffset timestamp,
+            int version,
+            Guid? previousVersionId,
+            bool isLatest,
+            bool isPinned,
+            bool isFrozen)
+            : base(id, canonicalKey, rowKey, ownerId, tenantId, createdBy, createdOn, timestamp,
+                   version, previousVersionId, isLatest, isPinned, isFrozen) { }
+
+        protected override NoopSecuredVersionedEntity CreateNextVersionCore() =>
+            new(Guid.NewGuid(), CanonicalKey, null, OwnerId, TenantId, CreatedBy,
+                DateTime.UtcNow, DateTimeOffset.UtcNow,
+                Version + 1, Id, isLatest: true, isPinned: false, isFrozen: false);
+
+        protected override NoopSecuredVersionedEntity CreateSuccessorCore(string newCanonicalKey) =>
+            new(Guid.NewGuid(), newCanonicalKey, null, OwnerId, TenantId, CreatedBy,
+                DateTime.UtcNow, DateTimeOffset.UtcNow,
+                1, null, isLatest: true, isPinned: false, isFrozen: false);
+        // No override for OnSuccessorCreated
+    }
+
+    [TestMethod]
+    public void OnSuccessorCreatedDefaultImplementationDoesNotThrowOrAffectState()
+    {
+        var entity = new NoopSecuredVersionedEntity(
+            Guid.NewGuid(), "noop-key", null, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            DateTime.UtcNow, DateTimeOffset.UtcNow, 1, null, true, false, false);
+
+        var successor = entity.CreateSuccessor("noop-key-successor");
+        Assert.IsNotNull(successor);
+        Assert.AreEqual("noop-key-successor", successor.CanonicalKey);
+        // No exception, no state change expected
+    }
 }
